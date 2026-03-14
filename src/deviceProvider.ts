@@ -73,11 +73,11 @@ export class DeviceProvider {
     return exe;
   }
 
-  private exec(command: string, args: string[]): Promise<string> {
+  private exec(command: string, args: string[], timeoutMs = 10000): Promise<string> {
     return new Promise((resolve, reject) => {
-      cp.execFile(command, args, { timeout: 10000, windowsHide: true }, (error, stdout, stderr) => {
+      cp.execFile(command, args, { timeout: timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
         if (error) {
-          reject(new Error(`${command} ${args.join(" ")} failed: ${stderr || error.message}`));
+          reject(new Error(`${command} ${args.join(" ")} failed: ${stderr || stdout || error.message}`));
           return;
         }
         resolve(stdout);
@@ -154,6 +154,20 @@ export class DeviceProvider {
 
       return devices;
     } catch {
+      if (!this.sdkPath) {
+        const openSettings = vscode.l10n.t("Open Settings");
+        vscode.window.showErrorMessage(
+          vscode.l10n.t("Android SDK not found. Set android-runner.sdkPath or the ANDROID_HOME environment variable."),
+          openSettings
+        ).then((selection) => {
+          if (selection === openSettings) {
+            vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "android-runner.sdkPath"
+            );
+          }
+        });
+      }
       return [];
     }
   }
@@ -227,7 +241,7 @@ export class DeviceProvider {
    * Install APK on device
    */
   public async installApk(deviceId: string, apkPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "install", "-r", apkPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "install", "-r", apkPath], 120000);
   }
 
   /**

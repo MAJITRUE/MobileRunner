@@ -1,0 +1,14 @@
+{
+  "displayName": "Android Runner",
+  "description": "VSCode から Android ネイティブプロジェクトを実行・デバッグ（Flutter 風のデバイス選択付き）",
+  "command.selectDevice": "Android Runner: デバイスを選択",
+  "command.run": "Android Runner: アプリを実行",
+  "command.stop": "Android Runner: アプリを停止",
+  "command.installAndRun": "Android Runner: ビルド・インストール・実行",
+  "command.filterLog": "Android Runner: ログをフィルター",
+  "config.sdkPath.description": "Android SDK のパス。空の場合、ANDROID_HOME または ANDROID_SDK_ROOT 環境変数を使用します。",
+  "config.javaHome.description": "JDK のパス。空の場合、JAVA_HOME、Android Studio、一般的なインストール先から自動検出します。",
+  "config.appModule.description": "アプリモジュール名（例: app, mobile, wear）。デフォルト: app。",
+  "config.buildVariant.description": "使用するビルドバリアント（例: debug, release）。",
+  "config.autoSelectDevice.description": "デバイスが接続されたときに自動的に選択します。"
+}

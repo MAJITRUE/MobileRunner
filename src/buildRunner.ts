@@ -32,8 +32,8 @@ export class BuildRunner implements vscode.Disposable {
       99
     );
     this.runStatusBarItem.name = "Android Run";
-    this.runStatusBarItem.text = "$(play) Run";
-    this.runStatusBarItem.tooltip = "Build and run Android app";
+    this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
+    this.runStatusBarItem.tooltip = vscode.l10n.t("Build and run Android app");
     this.runStatusBarItem.command = "android-runner.installAndRun";
     this.runStatusBarItem.show();
     this.disposables.push(this.runStatusBarItem);
@@ -45,8 +45,8 @@ export class BuildRunner implements vscode.Disposable {
       98
     );
     this.stopStatusBarItem.name = "Android Stop";
-    this.stopStatusBarItem.text = "$(debug-stop) Stop";
-    this.stopStatusBarItem.tooltip = "Stop running app";
+    this.stopStatusBarItem.text = `$(debug-stop) ${vscode.l10n.t("Stop")}`;
+    this.stopStatusBarItem.tooltip = vscode.l10n.t("Stop running app");
     this.stopStatusBarItem.command = "android-runner.stop";
     this.disposables.push(this.stopStatusBarItem);
   }
@@ -84,18 +84,33 @@ export class BuildRunner implements vscode.Disposable {
   /**
    * Find the APK after a successful build
    */
+  private getAppModule(): string {
+    const config = vscode.workspace.getConfiguration("android-runner");
+    return config.get<string>("appModule", "app");
+  }
+
   private findApk(projectRoot: string, variant: string): string | undefined {
-    const apkDir = path.join(projectRoot, "app", "build", "outputs", "apk", variant);
-    if (!fs.existsSync(apkDir)) {
-      return undefined;
+    const appModule = this.getAppModule();
+    const parentDir = path.dirname(projectRoot);
+    const searchDirs = [
+      path.join(projectRoot, appModule, "build", "outputs", "apk", variant),
+      path.join(projectRoot, appModule, "build", "outputs", "flutter-apk"),
+      // Flutter projects: APK may be in parent's build directory
+      path.join(parentDir, "build", appModule, "outputs", "apk", variant),
+      path.join(parentDir, "build", appModule, "outputs", "flutter-apk"),
+    ];
+
+    for (const apkDir of searchDirs) {
+      if (!fs.existsSync(apkDir)) {
+        continue;
+      }
+      const files = fs.readdirSync(apkDir).filter((f) => f.endsWith(".apk") && !f.endsWith("-androidTest.apk"));
+      if (files.length > 0) {
+        return path.join(apkDir, files[0]);
+      }
     }
 
-    const files = fs.readdirSync(apkDir).filter((f) => f.endsWith(".apk"));
-    if (files.length === 0) {
-      return undefined;
-    }
-
-    return path.join(apkDir, files[0]);
+    return undefined;
   }
 
   /**
@@ -106,7 +121,8 @@ export class BuildRunner implements vscode.Disposable {
     let packageName: string | undefined;
 
     // Try build.gradle.kts first (modern Android projects use namespace/applicationId)
-    for (const gradleFile of ["app/build.gradle.kts", "app/build.gradle"]) {
+    const appModule = this.getAppModule();
+    for (const gradleFile of [`${appModule}/build.gradle.kts`, `${appModule}/build.gradle`]) {
       const gradlePath = path.join(projectRoot, gradleFile);
       if (fs.existsSync(gradlePath)) {
         const gradleContent = fs.readFileSync(gradlePath, "utf-8");
@@ -127,7 +143,7 @@ export class BuildRunner implements vscode.Disposable {
 
     // Fallback: try package attribute in AndroidManifest.xml
     const manifestPath = path.join(
-      projectRoot, "app", "src", "main", "AndroidManifest.xml"
+      projectRoot, appModule, "src", "main", "AndroidManifest.xml"
     );
     if (!packageName && fs.existsSync(manifestPath)) {
       const content = fs.readFileSync(manifestPath, "utf-8");
@@ -163,6 +179,11 @@ export class BuildRunner implements vscode.Disposable {
    * @param skipDebugSession - skip starting a new debug session (used on restart)
    */
   public async installAndRun(skipDebugSession = false): Promise<void> {
+    if (this.isRunning) {
+      vscode.window.showWarningMessage(vscode.l10n.t("Build is already in progress."));
+      return;
+    }
+
     const device = this.deviceManager.getCurrentDevice();
     if (!device || !device.isOnline) {
       const selected = await this.deviceManager.showDevicePicker();
@@ -173,14 +194,14 @@ export class BuildRunner implements vscode.Disposable {
 
     const currentDevice = this.deviceManager.getCurrentDevice();
     if (!currentDevice || !currentDevice.isOnline) {
-      vscode.window.showErrorMessage("No online device selected.");
+      vscode.window.showErrorMessage(vscode.l10n.t("No online device selected."));
       return;
     }
 
     const projectRoot = this.findProjectRoot();
     if (!projectRoot) {
       vscode.window.showErrorMessage(
-        "No Android project found. Open a folder containing build.gradle or build.gradle.kts."
+        vscode.l10n.t("No Android project found. Open a folder containing build.gradle or build.gradle.kts.")
       );
       return;
     }
@@ -195,38 +216,38 @@ export class BuildRunner implements vscode.Disposable {
 
     try {
       // Step 1: Build
-      this.outputChannel.info(`▶ Building ${variant}...`);
-      this.outputChannel.info(`  Project: ${projectRoot}`);
-      this.outputChannel.info(`  Device: ${currentDevice.name} (${currentDevice.id})`);
+      this.outputChannel.info(vscode.l10n.t("▶ Building {0}...", variant));
+      this.outputChannel.info(vscode.l10n.t("  Project: {0}", projectRoot));
+      this.outputChannel.info(vscode.l10n.t("  Device: {0} ({1})", currentDevice.name, currentDevice.id));
 
       await this.runGradle(projectRoot, `assemble${capitalizedVariant}`);
 
       // Step 2: Find APK
       const apkPath = this.findApk(projectRoot, variant);
       if (!apkPath) {
-        throw new Error(`APK not found in app/build/outputs/apk/${variant}/`);
+        throw new Error(vscode.l10n.t("APK not found for variant {0}", variant));
       }
-      this.outputChannel.info(`✓ APK: ${apkPath}`);
+      this.outputChannel.info(vscode.l10n.t("✓ APK: {0}", apkPath));
 
       // Step 3: Install
-      this.outputChannel.info(`▶ Installing on ${currentDevice.name}...`);
+      this.outputChannel.info(vscode.l10n.t("▶ Installing on {0}...", currentDevice.name));
       await this.deviceProvider.installApk(currentDevice.id, apkPath);
-      this.outputChannel.info("✓ Installed");
+      this.outputChannel.info(vscode.l10n.t("✓ Installed"));
 
       // Step 4: Launch
       const pkgInfo = this.findPackageInfo(projectRoot);
       if (!pkgInfo) {
-        throw new Error("Could not determine package name from AndroidManifest.xml");
+        throw new Error(vscode.l10n.t("Could not determine package name from AndroidManifest.xml"));
       }
 
       this.lastPackageName = pkgInfo.packageName;
-      this.outputChannel.info(`▶ Launching ${pkgInfo.packageName}...`);
+      this.outputChannel.info(vscode.l10n.t("▶ Launching {0}...", pkgInfo.packageName));
       await this.deviceProvider.launchActivity(
         currentDevice.id,
         pkgInfo.packageName,
         pkgInfo.launcherActivity
       );
-      this.outputChannel.info("✓ Launched");
+      this.outputChannel.info(vscode.l10n.t("✓ Launched"));
 
       // Step 5: Start logcat (filtered by app PID)
       this.outputChannel.info("--- Logcat ---");
@@ -239,9 +260,9 @@ export class BuildRunner implements vscode.Disposable {
         if (pid) { break; }
       }
       if (pid) {
-        this.outputChannel.info(`(filtered by PID ${pid})`);
+        this.outputChannel.info(vscode.l10n.t("(filtered by PID {0})", pid));
       } else {
-        this.outputChannel.warn("could not get app PID, showing all logs");
+        this.outputChannel.warn(vscode.l10n.t("Could not get app PID, showing all logs"));
       }
       this.logcatProcess = this.deviceProvider.startLogcat(
         currentDevice.id,
@@ -258,7 +279,7 @@ export class BuildRunner implements vscode.Disposable {
       );
 
       // Build done — update status bar
-      this.runStatusBarItem.text = "$(play) Run";
+      this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
 
       // Start debug session for floating toolbar (skip on restart)
       if (!skipDebugSession) {
@@ -278,18 +299,18 @@ export class BuildRunner implements vscode.Disposable {
   public async setLogFilter(): Promise<void> {
     const current = this.logFilter || "";
     const input = await vscode.window.showInputBox({
-      prompt: "Filter logcat output (leave empty to clear filter)",
+      prompt: vscode.l10n.t("Filter logcat output (leave empty to clear filter)"),
       value: current,
-      placeHolder: "e.g. MainActivity, Error, warning",
+      placeHolder: vscode.l10n.t("e.g. MainActivity, Error, warning"),
     });
     if (input === undefined) {
       return; // cancelled
     }
     this.logFilter = input || undefined;
     if (this.logFilter) {
-      this.outputChannel.appendLine(`\n--- Filter set: "${this.logFilter}" ---`);
+      this.outputChannel.appendLine(`\n--- ${vscode.l10n.t('Filter set: "{0}"', this.logFilter)} ---`);
     } else {
-      this.outputChannel.appendLine("\n--- Filter cleared ---");
+      this.outputChannel.appendLine(`\n--- ${vscode.l10n.t("Filter cleared")} ---`);
     }
   }
 
@@ -336,7 +357,7 @@ export class BuildRunner implements vscode.Disposable {
     if (device && this.lastPackageName) {
       try {
         await this.deviceProvider.stopApp(device.id, this.lastPackageName);
-        this.outputChannel.info("■ App stopped");
+        this.outputChannel.info(vscode.l10n.t("■ App stopped"));
       } catch {
         // ignore
       }
@@ -357,6 +378,100 @@ export class BuildRunner implements vscode.Disposable {
     this.setRunning(false);
   }
 
+  /**
+   * Auto-detect JAVA_HOME from common locations
+   */
+  private detectJavaHome(): string | undefined {
+    // 1. Plugin setting (highest priority)
+    const config = vscode.workspace.getConfiguration("android-runner");
+    const configJavaHome = config.get<string>("javaHome");
+    if (configJavaHome && fs.existsSync(configJavaHome)) {
+      return configJavaHome;
+    }
+
+    // 2. Already set in environment
+    if (process.env.JAVA_HOME && fs.existsSync(process.env.JAVA_HOME)) {
+      return process.env.JAVA_HOME;
+    }
+
+    const isMac = process.platform === "darwin";
+    const isWindows = process.platform === "win32";
+
+    // 2. Android Studio bundled JDK (most reliable for Android development)
+    const androidStudioJdkPaths = isMac
+      ? [
+          "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
+          `${process.env.HOME}/Applications/Android Studio.app/Contents/jbr/Contents/Home`,
+        ]
+      : isWindows
+        ? [
+            `${process.env.LOCALAPPDATA}\\Programs\\Android\\Android Studio\\jbr`,
+            `C:\\Program Files\\Android\\Android Studio\\jbr`,
+          ]
+        : [
+            `${process.env.HOME}/android-studio/jbr`,
+            "/opt/android-studio/jbr",
+            "/usr/local/android-studio/jbr",
+          ];
+
+    for (const p of androidStudioJdkPaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+
+    // 3. macOS: use /usr/libexec/java_home
+    if (isMac) {
+      try {
+        const result = cp.execSync("/usr/libexec/java_home 2>/dev/null", {
+          encoding: "utf-8",
+          timeout: 5000,
+        }).trim();
+        if (result && fs.existsSync(result)) {
+          return result;
+        }
+      } catch {
+        // not available
+      }
+    }
+
+    // 4. Common JDK install paths
+    const commonPaths = isMac
+      ? [
+          "/Library/Java/JavaVirtualMachines",
+          `${process.env.HOME}/Library/Java/JavaVirtualMachines`,
+        ]
+      : isWindows
+        ? [
+            `${process.env.ProgramFiles}\\Java`,
+            `${process.env.ProgramFiles}\\Eclipse Adoptium`,
+            `${process.env.ProgramFiles}\\Microsoft\\jdk`,
+            `${process.env.ProgramFiles}\\Zulu`,
+          ]
+        : ["/usr/lib/jvm"];
+
+    const javaExe = isWindows ? "java.exe" : "java";
+    for (const dir of commonPaths) {
+      if (fs.existsSync(dir)) {
+        try {
+          const entries = fs.readdirSync(dir).sort().reverse();
+          for (const entry of entries) {
+            const home = isMac
+              ? path.join(dir, entry, "Contents", "Home")
+              : path.join(dir, entry);
+            if (fs.existsSync(path.join(home, "bin", javaExe))) {
+              return home;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    return undefined;
+  }
+
   private runGradle(projectRoot: string, task: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const isWindows = process.platform === "win32";
@@ -371,14 +486,37 @@ export class BuildRunner implements vscode.Disposable {
           ? "gradlew.bat"
           : "./gradlew";
 
+      const env = { ...process.env };
+      const detectedJavaHome = this.detectJavaHome();
+      if (detectedJavaHome) {
+        env.JAVA_HOME = detectedJavaHome;
+        this.outputChannel.info(`  JAVA_HOME: ${detectedJavaHome}`);
+      } else {
+        this.outputChannel.warn(vscode.l10n.t("JAVA_HOME not found. Build may fail."));
+        const openSettings = vscode.l10n.t("Open Settings");
+        vscode.window.showWarningMessage(
+          vscode.l10n.t("JDK not found. Set android-runner.javaHome or install a JDK."),
+          openSettings
+        ).then((selection) => {
+          if (selection === openSettings) {
+            vscode.commands.executeCommand(
+              "workbench.action.openSettings",
+              "android-runner.javaHome"
+            );
+          }
+        });
+      }
+
       if (isWindows) {
         this.buildProcess = cp.spawn("cmd.exe", ["/c", executable, task, "--console=plain"], {
           cwd: projectRoot,
+          env,
           windowsHide: true,
         });
       } else {
         this.buildProcess = cp.spawn(executable, [task, "--console=plain"], {
           cwd: projectRoot,
+          env,
         });
       }
 
@@ -399,10 +537,10 @@ export class BuildRunner implements vscode.Disposable {
       this.buildProcess.on("close", (code) => {
         this.buildProcess = undefined;
         if (code === 0) {
-          this.outputChannel.info("✓ Build successful");
+          this.outputChannel.info(vscode.l10n.t("✓ Build successful"));
           resolve();
         } else {
-          reject(new Error(`Gradle build failed with exit code ${code}`));
+          reject(new Error(vscode.l10n.t("Gradle build failed with exit code {0}", code ?? -1)));
         }
       });
 
@@ -430,10 +568,10 @@ export class BuildRunner implements vscode.Disposable {
   private setRunning(running: boolean): void {
     this.isRunning = running;
     if (running) {
-      this.runStatusBarItem.text = "$(loading~spin) Building...";
+      this.runStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
       this.stopStatusBarItem.show();
     } else {
-      this.runStatusBarItem.text = "$(play) Run";
+      this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
       this.stopStatusBarItem.hide();
     }
   }

@@ -1,0 +1,14 @@
+{
+  "displayName": "Android Runner",
+  "description": "Run and debug Android native projects from VSCode with Flutter-like device selection",
+  "command.selectDevice": "Android Runner: Select Device",
+  "command.run": "Android Runner: Run App",
+  "command.stop": "Android Runner: Stop App",
+  "command.installAndRun": "Android Runner: Build, Install & Run",
+  "command.filterLog": "Android Runner: Filter Log",
+  "config.sdkPath.description": "Path to Android SDK. If empty, uses ANDROID_HOME or ANDROID_SDK_ROOT environment variable.",
+  "config.javaHome.description": "Path to JDK. If empty, auto-detects from JAVA_HOME, Android Studio, or common install locations.",
+  "config.appModule.description": "App module name (e.g., app, mobile, wear). Default: app.",
+  "config.buildVariant.description": "Build variant to use (e.g., debug, release).",
+  "config.autoSelectDevice.description": "Automatically select a device when one connects."
+}

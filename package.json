@@ -1,7 +1,7 @@
 {
   "name": "android-runner",
-  "displayName": "Android Runner",
-  "description": "Run and debug Android native projects from VSCode with Flutter-like device selection",
+  "displayName": "%displayName%",
+  "description": "%description%",
   "version": "0.1.0",
   "publisher": "majitrue",
   "license": "MIT",
@@ -29,28 +29,29 @@
     "workspaceContains:**/build.gradle.kts",
     "workspaceContains:**/AndroidManifest.xml"
   ],
+  "l10n": "./l10n",
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "android-runner.selectDevice",
-        "title": "Android Runner: Select Device"
+        "title": "%command.selectDevice%"
       },
       {
         "command": "android-runner.run",
-        "title": "Android Runner: Run App"
+        "title": "%command.run%"
       },
       {
         "command": "android-runner.stop",
-        "title": "Android Runner: Stop App"
+        "title": "%command.stop%"
       },
       {
         "command": "android-runner.installAndRun",
-        "title": "Android Runner: Build, Install & Run"
+        "title": "%command.installAndRun%"
       },
       {
         "command": "android-runner.filterLog",
-        "title": "Android Runner: Filter Log"
+        "title": "%command.filterLog%"
       }
     ],
     "debuggers": [
@@ -71,17 +72,27 @@
         "android-runner.sdkPath": {
           "type": "string",
           "default": "",
-          "description": "Path to Android SDK. If empty, uses ANDROID_HOME or ANDROID_SDK_ROOT environment variable."
+          "description": "%config.sdkPath.description%"
+        },
+        "android-runner.javaHome": {
+          "type": "string",
+          "default": "",
+          "description": "%config.javaHome.description%"
+        },
+        "android-runner.appModule": {
+          "type": "string",
+          "default": "app",
+          "description": "%config.appModule.description%"
         },
         "android-runner.buildVariant": {
           "type": "string",
           "default": "debug",
-          "description": "Build variant to use (e.g., debug, release)."
+          "description": "%config.buildVariant.description%"
         },
         "android-runner.autoSelectDevice": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically select a device when one connects."
+          "description": "%config.autoSelectDevice.description%"
         }
       }
     }

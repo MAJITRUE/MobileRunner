@@ -26,7 +26,7 @@ export class DeviceManager implements vscode.Disposable {
     );
     this.statusBarItem.name = "Android Device";
     this.statusBarItem.command = "android-runner.selectDevice";
-    this.statusBarItem.tooltip = "Select Android Device";
+    this.statusBarItem.tooltip = vscode.l10n.t("Select Android Device");
     this.disposables.push(this.statusBarItem);
 
     this.updateStatusBar();
@@ -49,7 +49,7 @@ export class DeviceManager implements vscode.Disposable {
    */
   public async showDevicePicker(): Promise<AndroidDevice | undefined> {
     const quickPick = vscode.window.createQuickPick<DevicePickItem>();
-    quickPick.placeholder = "Select an Android device or emulator";
+    quickPick.placeholder = vscode.l10n.t("Select an Android device or emulator");
     quickPick.busy = true;
     quickPick.ignoreFocusOut = true;
     quickPick.show();
@@ -101,7 +101,7 @@ export class DeviceManager implements vscode.Disposable {
     const onlineDevices = this.devices.filter((d) => d.isOnline);
     if (onlineDevices.length > 0) {
       items.push({
-        label: "Connected Devices",
+        label: vscode.l10n.t("Connected Devices"),
         kind: vscode.QuickPickItemKind.Separator,
       });
       for (const device of onlineDevices) {
@@ -109,7 +109,7 @@ export class DeviceManager implements vscode.Disposable {
         items.push({
           label: `${icon} ${device.name}`,
           description: device.id,
-          detail: device.type === "emulator" ? "Emulator" : "Physical Device",
+          detail: device.type === "emulator" ? vscode.l10n.t("Emulator") : vscode.l10n.t("Physical Device"),
           device,
         });
       }
@@ -127,13 +127,13 @@ export class DeviceManager implements vscode.Disposable {
 
     if (offlineEmulators.length > 0) {
       items.push({
-        label: "Available Emulators (not running)",
+        label: vscode.l10n.t("Available Emulators (not running)"),
         kind: vscode.QuickPickItemKind.Separator,
       });
       for (const emu of offlineEmulators) {
         items.push({
           label: `$(vm) ${emu.name}`,
-          description: "Click to launch",
+          description: vscode.l10n.t("Click to launch"),
           emulator: emu,
         });
       }
@@ -143,7 +143,7 @@ export class DeviceManager implements vscode.Disposable {
     const offlineDevices = this.devices.filter((d) => !d.isOnline);
     if (offlineDevices.length > 0) {
       items.push({
-        label: "Offline / Unauthorized",
+        label: vscode.l10n.t("Offline / Unauthorized"),
         kind: vscode.QuickPickItemKind.Separator,
       });
       for (const device of offlineDevices) {
@@ -158,8 +158,8 @@ export class DeviceManager implements vscode.Disposable {
     // No devices at all
     if (items.length === 0) {
       items.push({
-        label: "$(info) No devices found",
-        description: "Connect a device or create an AVD in Android Studio",
+        label: vscode.l10n.t("$(info) No devices found"),
+        description: vscode.l10n.t("Connect a device or create an AVD in Android Studio"),
       });
     }
 
@@ -169,7 +169,7 @@ export class DeviceManager implements vscode.Disposable {
       kind: vscode.QuickPickItemKind.Separator,
     });
     items.push({
-      label: "$(refresh) Refresh device list",
+      label: vscode.l10n.t("$(refresh) Refresh device list"),
       action: "refresh",
     });
 
@@ -180,7 +180,7 @@ export class DeviceManager implements vscode.Disposable {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Launching emulator: ${emulator.name}...`,
+        title: vscode.l10n.t("Launching emulator: {0}...", emulator.name),
         cancellable: false,
       },
       async () => {
@@ -200,7 +200,7 @@ export class DeviceManager implements vscode.Disposable {
         }
 
         vscode.window.showWarningMessage(
-          `Emulator ${emulator.name} launched but not yet connected. Select it manually when ready.`
+          vscode.l10n.t("Emulator {0} launched but not yet connected. Select it manually when ready.", emulator.name)
         );
       }
     );
@@ -246,7 +246,7 @@ export class DeviceManager implements vscode.Disposable {
       this.statusBarItem.text = `${icon} ${this.currentDevice.name}`;
       this.statusBarItem.backgroundColor = undefined;
     } else {
-      this.statusBarItem.text = "$(device-mobile) No Device";
+      this.statusBarItem.text = `$(device-mobile) ${vscode.l10n.t("No Device")}`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.warningBackground"
       );
