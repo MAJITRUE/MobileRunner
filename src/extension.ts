@@ -55,6 +55,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand("android-runner.restart", () => {
+      buildRunner?.restart();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand("android-runner.filterLog", () => {
       buildRunner?.setLogFilter();
     })
@@ -111,12 +117,8 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
           this.sendResponse(message, {});
           break;
         case "restart":
-          vscode.commands.executeCommand("android-runner.stop").then(() => {
-            setTimeout(() => {
-              vscode.commands.executeCommand("android-runner.installAndRun");
-            }, 500);
-          });
           this.sendResponse(message, {});
+          vscode.commands.executeCommand("android-runner.restart");
           break;
         case "disconnect":
         case "terminate":

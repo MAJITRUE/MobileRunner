@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "majitrue",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MAJITRUE/AndroidRunner"
+  },
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },

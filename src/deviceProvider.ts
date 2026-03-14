@@ -28,11 +28,27 @@ export class DeviceProvider {
     if (configPath) {
       return configPath;
     }
-    return (
-      process.env.ANDROID_HOME ||
-      process.env.ANDROID_SDK_ROOT ||
-      undefined
-    );
+    if (process.env.ANDROID_HOME) {
+      return process.env.ANDROID_HOME;
+    }
+    if (process.env.ANDROID_SDK_ROOT) {
+      return process.env.ANDROID_SDK_ROOT;
+    }
+
+    // Auto-detect common SDK locations
+    const fs = require("fs");
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    const candidates = [
+      path.join(home, "AppData", "Local", "Android", "Sdk"), // Windows
+      path.join(home, "Library", "Android", "sdk"),           // macOS
+      path.join(home, "Android", "Sdk"),                      // Linux
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return undefined;
   }
 
   public refreshSdkPath(): void {
@@ -40,22 +56,26 @@ export class DeviceProvider {
   }
 
   private getAdbPath(): string {
+    const isWindows = process.platform === "win32";
+    const exe = isWindows ? "adb.exe" : "adb";
     if (this.sdkPath) {
-      return path.join(this.sdkPath, "platform-tools", "adb");
+      return path.join(this.sdkPath, "platform-tools", exe);
     }
-    return "adb";
+    return exe;
   }
 
   private getEmulatorPath(): string {
+    const isWindows = process.platform === "win32";
+    const exe = isWindows ? "emulator.exe" : "emulator";
     if (this.sdkPath) {
-      return path.join(this.sdkPath, "emulator", "emulator");
+      return path.join(this.sdkPath, "emulator", exe);
     }
-    return "emulator";
+    return exe;
   }
 
   private exec(command: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      cp.execFile(command, args, { timeout: 10000 }, (error, stdout, stderr) => {
+      cp.execFile(command, args, { timeout: 10000, windowsHide: true }, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(`${command} ${args.join(" ")} failed: ${stderr || error.message}`));
           return;
@@ -161,8 +181,8 @@ export class DeviceProvider {
     const emulatorPath = this.getEmulatorPath();
     // Spawn detached so it doesn't block VSCode
     const child = cp.spawn(emulatorPath, ["-avd", avdName], {
-      detached: true,
       stdio: "ignore",
+      windowsHide: true,
     });
     child.unref();
   }
@@ -194,7 +214,8 @@ export class DeviceProvider {
       const fs = require("fs");
       const versions = fs.readdirSync(buildToolsDir).sort().reverse();
       if (versions.length > 0) {
-        return path.join(buildToolsDir, versions[0], "aapt2");
+        const exe = process.platform === "win32" ? "aapt2.exe" : "aapt2";
+        return path.join(buildToolsDir, versions[0], exe);
       }
     } catch {
       // ignore
@@ -290,7 +311,7 @@ export class DeviceProvider {
       args.push("--pid", pid);
     }
 
-    const child = cp.spawn(this.getAdbPath(), args);
+    const child = cp.spawn(this.getAdbPath(), args, { windowsHide: true });
 
     child.stdout?.on("data", (data: Buffer) => {
       const text = data.toString();

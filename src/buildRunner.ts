@@ -160,8 +160,9 @@ export class BuildRunner implements vscode.Disposable {
 
   /**
    * Build, install, and run the app
+   * @param skipDebugSession - skip starting a new debug session (used on restart)
    */
-  public async installAndRun(): Promise<void> {
+  public async installAndRun(skipDebugSession = false): Promise<void> {
     const device = this.deviceManager.getCurrentDevice();
     if (!device || !device.isOnline) {
       const selected = await this.deviceManager.showDevicePicker();
@@ -256,8 +257,13 @@ export class BuildRunner implements vscode.Disposable {
         }
       );
 
-      // Start debug session for floating toolbar
-      await this.startDebugSession(currentDevice.name);
+      // Build done — update status bar
+      this.runStatusBarItem.text = "$(play) Run";
+
+      // Start debug session for floating toolbar (skip on restart)
+      if (!skipDebugSession) {
+        await this.startDebugSession(currentDevice.name);
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.outputChannel.error(`✗ ${msg}`);
@@ -306,6 +312,23 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   /**
+   * Restart: stop app and logcat, rebuild and relaunch, keeping the same debug session
+   */
+  public async restart(): Promise<void> {
+    const device = this.deviceManager.getCurrentDevice();
+    if (device && this.lastPackageName) {
+      try {
+        await this.deviceProvider.stopApp(device.id, this.lastPackageName);
+      } catch {
+        // ignore
+      }
+    }
+    this.stopLogcat();
+    this.killBuild();
+    await this.installAndRun(true);
+  }
+
+  /**
    * Stop the running app
    */
   public async stop(): Promise<void> {
@@ -348,10 +371,16 @@ export class BuildRunner implements vscode.Disposable {
           ? "gradlew.bat"
           : "./gradlew";
 
-      this.buildProcess = cp.spawn(executable, [task, "--console=plain"], {
-        cwd: projectRoot,
-        shell: isWindows,
-      });
+      if (isWindows) {
+        this.buildProcess = cp.spawn("cmd.exe", ["/c", executable, task, "--console=plain"], {
+          cwd: projectRoot,
+          windowsHide: true,
+        });
+      } else {
+        this.buildProcess = cp.spawn(executable, [task, "--console=plain"], {
+          cwd: projectRoot,
+        });
+      }
 
       this.buildProcess.stdout?.on("data", (data: Buffer) => {
         for (const line of data.toString().split("\n")) {
