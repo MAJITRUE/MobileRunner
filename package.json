@@ -1,0 +1,98 @@
+{
+  "name": "android-runner",
+  "displayName": "Android Runner",
+  "description": "Run and debug Android native projects from VSCode with Flutter-like device selection",
+  "version": "0.1.0",
+  "publisher": "majitrue",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "android",
+    "emulator",
+    "adb",
+    "gradle",
+    "device"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/build.gradle",
+    "workspaceContains:**/build.gradle.kts",
+    "workspaceContains:**/AndroidManifest.xml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "android-runner.selectDevice",
+        "title": "Android Runner: Select Device"
+      },
+      {
+        "command": "android-runner.run",
+        "title": "Android Runner: Run App"
+      },
+      {
+        "command": "android-runner.stop",
+        "title": "Android Runner: Stop App"
+      },
+      {
+        "command": "android-runner.installAndRun",
+        "title": "Android Runner: Build, Install & Run"
+      },
+      {
+        "command": "android-runner.filterLog",
+        "title": "Android Runner: Filter Log"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "android-runner",
+        "label": "Android Runner",
+        "languages": ["kotlin", "java"],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {}
+          }
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Android Runner",
+      "properties": {
+        "android-runner.sdkPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Android SDK. If empty, uses ANDROID_HOME or ANDROID_SDK_ROOT environment variable."
+        },
+        "android-runner.buildVariant": {
+          "type": "string",
+          "default": "debug",
+          "description": "Build variant to use (e.g., debug, release)."
+        },
+        "android-runner.autoSelectDevice": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically select a device when one connects."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  }
+}
