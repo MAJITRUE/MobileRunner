@@ -51,3 +51,7 @@ Build, install, and run Android native projects directly from VSCode — with a 
 ## License
 
 MIT
+
+---
+
+Created with [Claude Code](https://claude.ai/claude-code) (Anthropic Claude Opus 4.6)
