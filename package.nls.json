@@ -1,5 +1,5 @@
 {
-  "displayName": "Android Runner",
+  "displayName": "Android Build & Run",
   "description": "Run and debug Android native projects from VSCode with Flutter-like device selection",
   "command.selectDevice": "Android Runner: Select Device",
   "command.run": "Android Runner: Run App",

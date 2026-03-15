@@ -1,6 +1,6 @@
-# Android Runner
+# Android Build & Run
 
-Build, install, and run Android native projects directly from VSCode — with a Flutter-like device selection experience.
+Build, install, and run Android native projects directly from VSCode with a Flutter-like device selection experience.
 
 ## Features
 
@@ -51,7 +51,3 @@ Build, install, and run Android native projects directly from VSCode — with a 
 ## License
 
 MIT
-
----
-
-Created with [Claude Code](https://claude.ai/claude-code) (Anthropic Claude Opus 4.6)
