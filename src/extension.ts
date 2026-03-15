@@ -24,52 +24,70 @@ export function activate(context: vscode.ExtensionContext) {
   // Register debug adapter for floating toolbar + debug console
   context.subscriptions.push(
     vscode.debug.registerDebugAdapterDescriptorFactory(
-      "android-runner",
+      "mobile-runner",
       new AndroidDebugAdapterFactory()
     )
   );
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.selectDevice", () => {
+    vscode.commands.registerCommand("mobile-runner.selectDevice", () => {
       deviceManager?.showDevicePicker();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.run", () => {
+    vscode.commands.registerCommand("mobile-runner.run", () => {
       buildRunner?.installAndRun();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.installAndRun", () => {
+    vscode.commands.registerCommand("mobile-runner.installAndRun", () => {
       buildRunner?.installAndRun();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.stop", () => {
+    vscode.commands.registerCommand("mobile-runner.stop", () => {
       buildRunner?.stop();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.restart", () => {
+    vscode.commands.registerCommand("mobile-runner.restart", () => {
       buildRunner?.restart();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("android-runner.filterLog", () => {
+    vscode.commands.registerCommand("mobile-runner.filterLog", () => {
       buildRunner?.setLogFilter();
+    })
+  );
+
+  // Capture debug session when it starts
+  context.subscriptions.push(
+    vscode.debug.onDidStartDebugSession((session) => {
+      if (session.type === "mobile-runner") {
+        buildRunner?.onDebugSessionStarted(session);
+      }
+    })
+  );
+
+  // When debug session ends (floating toolbar stop button pressed)
+  context.subscriptions.push(
+    vscode.debug.onDidTerminateDebugSession((session) => {
+      if (session.type === "mobile-runner") {
+        buildRunner?.onDebugSessionEnded(session);
+      }
     })
   );
 
   // Listen for config changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("android-runner.sdkPath")) {
+      if (e.affectsConfiguration("mobile-runner.sdkPath")) {
         deviceProvider.refreshSdkPath();
       }
     })
@@ -79,11 +97,6 @@ export function activate(context: vscode.ExtensionContext) {
   deviceManager.refreshDevices();
 }
 
-/**
- * Inline debug adapter that provides:
- * - Floating toolbar (stop/restart)
- * - Debug console output for logcat
- */
 class AndroidDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
   createDebugAdapterDescriptor(
     _session: vscode.DebugSession
@@ -118,11 +131,10 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
           break;
         case "restart":
           this.sendResponse(message, {});
-          vscode.commands.executeCommand("android-runner.restart");
+          vscode.commands.executeCommand("mobile-runner.restart");
           break;
         case "disconnect":
         case "terminate":
-          vscode.commands.executeCommand("android-runner.stop");
           this.sendResponse(message, {});
           break;
         case "threads":
@@ -157,6 +169,17 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
       success: true,
       command: request.command,
       body,
+      seq: this.seq++,
+    });
+  }
+
+  /**
+   * Send DAP terminated event to end the debug session
+   */
+  public sendTerminated(): void {
+    this.onDidSendMessageEmitter.fire({
+      type: "event",
+      event: "terminated",
       seq: this.seq++,
     });
   }

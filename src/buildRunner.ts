@@ -11,6 +11,7 @@ export class BuildRunner implements vscode.Disposable {
   private buildProcess: cp.ChildProcess | undefined;
   private logcatProcess: cp.ChildProcess | undefined;
   private runStatusBarItem: vscode.StatusBarItem;
+  private buildingStatusBarItem: vscode.StatusBarItem;
   private stopStatusBarItem: vscode.StatusBarItem;
   private isRunning = false;
   private lastPackageName: string | undefined;
@@ -25,7 +26,7 @@ export class BuildRunner implements vscode.Disposable {
     this.outputChannel = vscode.window.createOutputChannel("Android Runner", { log: true });
     this.disposables.push(this.outputChannel);
 
-    // Run button in status bar
+    // Run button (visible when idle)
     this.runStatusBarItem = vscode.window.createStatusBarItem(
       "androidRunnerRun",
       vscode.StatusBarAlignment.Right,
@@ -34,11 +35,21 @@ export class BuildRunner implements vscode.Disposable {
     this.runStatusBarItem.name = "Android Run";
     this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
     this.runStatusBarItem.tooltip = vscode.l10n.t("Build and run Android app");
-    this.runStatusBarItem.command = "android-runner.installAndRun";
+    this.runStatusBarItem.command = "mobile-runner.installAndRun";
     this.runStatusBarItem.show();
     this.disposables.push(this.runStatusBarItem);
 
-    // Stop button (hidden by default)
+    // Building indicator (visible only during build, not clickable)
+    this.buildingStatusBarItem = vscode.window.createStatusBarItem(
+      "androidRunnerBuilding",
+      vscode.StatusBarAlignment.Right,
+      99
+    );
+    this.buildingStatusBarItem.name = "Android Building";
+    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
+    this.disposables.push(this.buildingStatusBarItem);
+
+    // Stop button (visible during build and while app is running)
     this.stopStatusBarItem = vscode.window.createStatusBarItem(
       "androidRunnerStop",
       vscode.StatusBarAlignment.Right,
@@ -47,7 +58,7 @@ export class BuildRunner implements vscode.Disposable {
     this.stopStatusBarItem.name = "Android Stop";
     this.stopStatusBarItem.text = `$(debug-stop) ${vscode.l10n.t("Stop")}`;
     this.stopStatusBarItem.tooltip = vscode.l10n.t("Stop running app");
-    this.stopStatusBarItem.command = "android-runner.stop";
+    this.stopStatusBarItem.command = "mobile-runner.stop";
     this.disposables.push(this.stopStatusBarItem);
   }
 
@@ -85,7 +96,7 @@ export class BuildRunner implements vscode.Disposable {
    * Find the APK after a successful build
    */
   private getAppModule(): string {
-    const config = vscode.workspace.getConfiguration("android-runner");
+    const config = vscode.workspace.getConfiguration("mobile-runner");
     return config.get<string>("appModule", "app");
   }
 
@@ -206,12 +217,13 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration("android-runner");
+    const config = vscode.workspace.getConfiguration("mobile-runner");
     const variant = config.get<string>("buildVariant", "debug");
     const capitalizedVariant = variant.charAt(0).toUpperCase() + variant.slice(1);
 
     this.outputChannel.clear();
     this.outputChannel.show(true);
+    this.buildCancelled = false;
     this.setRunning(true);
 
     try {
@@ -278,14 +290,19 @@ export class BuildRunner implements vscode.Disposable {
         }
       );
 
-      // Build done — update status bar
-      this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
+      // Build done — hide Building, keep Stop only
+      this.setBuildDone();
 
-      // Start debug session for floating toolbar (skip on restart)
-      if (!skipDebugSession) {
+      // Start debug session for floating toolbar (skip on restart and if already active)
+      if (!skipDebugSession && !this.debugSession) {
         await this.startDebugSession(currentDevice.name);
       }
     } catch (error) {
+      if (this.buildCancelled) {
+        this.buildCancelled = false;
+        this.outputChannel.info(vscode.l10n.t("■ Build cancelled"));
+        return;
+      }
       const msg = error instanceof Error ? error.message : String(error);
       this.outputChannel.error(`✗ ${msg}`);
       vscode.window.showErrorMessage(`Android Runner: ${msg}`);
@@ -315,21 +332,24 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   /**
+   * Called when a mobile-runner debug session starts (captured via onDidStartDebugSession)
+   */
+  public onDebugSessionStarted(session: vscode.DebugSession): void {
+    this.debugSession = session;
+  }
+
+  /**
    * Start a debug session to show the floating toolbar
    */
   private async startDebugSession(deviceName: string): Promise<void> {
-    // Stop any existing debug session first
-    if (this.debugSession) {
-      await vscode.debug.stopDebugging(this.debugSession);
-      this.debugSession = undefined;
-    }
+    await this.endDebugSession();
 
     await vscode.debug.startDebugging(undefined, {
-      type: "android-runner",
+      type: "mobile-runner",
       name: `Android: ${deviceName}`,
       request: "launch",
     });
-    this.debugSession = vscode.debug.activeDebugSession;
+    // debugSession is set by onDebugSessionStarted callback
   }
 
   /**
@@ -346,13 +366,56 @@ export class BuildRunner implements vscode.Disposable {
     }
     this.stopLogcat();
     this.killBuild();
+    this.isRunning = false;
     await this.installAndRun(true);
   }
 
   /**
-   * Stop the running app
+   * Called when the debug session ends (floating toolbar stop button pressed)
+   */
+  public onDebugSessionEnded(session: vscode.DebugSession): void {
+    if (this.debugSession !== session) {
+      return;
+    }
+    this.debugSession = undefined;
+    this.stopApp();
+  }
+
+  /**
+   * Stop the running app (from status bar Stop button)
    */
   public async stop(): Promise<void> {
+    await this.stopApp();
+    await this.endDebugSession();
+  }
+
+  private async endDebugSession(): Promise<void> {
+    this.debugSession = undefined;
+
+    // 1. Send DAP terminated event
+    const adapter = getDebugAdapter();
+    if (adapter) {
+      adapter.sendTerminated();
+    }
+
+    // 2. Also force-stop via API (belt and suspenders)
+    try {
+      const active = vscode.debug.activeDebugSession;
+      if (active?.type === "mobile-runner") {
+        await vscode.debug.stopDebugging(active);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private async stopApp(): Promise<void> {
+    // Show "Stopping..." (not clickable)
+    this.stopStatusBarItem.hide();
+    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Stopping...")}`;
+    this.buildingStatusBarItem.command = undefined;
+    this.buildingStatusBarItem.show();
+
     const device = this.deviceManager.getCurrentDevice();
     if (device && this.lastPackageName) {
       try {
@@ -363,18 +426,11 @@ export class BuildRunner implements vscode.Disposable {
       }
     }
 
-    // Stop debug session (floating toolbar)
-    if (this.debugSession) {
-      try {
-        await vscode.debug.stopDebugging(this.debugSession);
-      } catch {
-        // ignore
-      }
-      this.debugSession = undefined;
-    }
-
     this.stopLogcat();
     this.killBuild();
+
+    // Reset building text for next build
+    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
     this.setRunning(false);
   }
 
@@ -383,7 +439,7 @@ export class BuildRunner implements vscode.Disposable {
    */
   private detectJavaHome(): string | undefined {
     // 1. Plugin setting (highest priority)
-    const config = vscode.workspace.getConfiguration("android-runner");
+    const config = vscode.workspace.getConfiguration("mobile-runner");
     const configJavaHome = config.get<string>("javaHome");
     if (configJavaHome && fs.existsSync(configJavaHome)) {
       return configJavaHome;
@@ -495,13 +551,13 @@ export class BuildRunner implements vscode.Disposable {
         this.outputChannel.warn(vscode.l10n.t("JAVA_HOME not found. Build may fail."));
         const openSettings = vscode.l10n.t("Open Settings");
         vscode.window.showWarningMessage(
-          vscode.l10n.t("JDK not found. Set android-runner.javaHome or install a JDK."),
+          vscode.l10n.t("JDK not found. Set mobile-runner.javaHome or install a JDK."),
           openSettings
         ).then((selection) => {
           if (selection === openSettings) {
             vscode.commands.executeCommand(
               "workbench.action.openSettings",
-              "android-runner.javaHome"
+              "mobile-runner.javaHome"
             );
           }
         });
@@ -551,8 +607,11 @@ export class BuildRunner implements vscode.Disposable {
     });
   }
 
+  private buildCancelled = false;
+
   private killBuild(): void {
     if (this.buildProcess) {
+      this.buildCancelled = true;
       this.buildProcess.kill();
       this.buildProcess = undefined;
     }
@@ -568,12 +627,21 @@ export class BuildRunner implements vscode.Disposable {
   private setRunning(running: boolean): void {
     this.isRunning = running;
     if (running) {
-      this.runStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
+      // Building: hide Run, show Building + Stop
+      this.runStatusBarItem.hide();
+      this.buildingStatusBarItem.show();
       this.stopStatusBarItem.show();
     } else {
-      this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
+      // Idle: show Run, hide Building + Stop
+      this.runStatusBarItem.show();
+      this.buildingStatusBarItem.hide();
       this.stopStatusBarItem.hide();
     }
+  }
+
+  private setBuildDone(): void {
+    // App running: hide Building, keep Stop, keep Run hidden
+    this.buildingStatusBarItem.hide();
   }
 
   dispose(): void {

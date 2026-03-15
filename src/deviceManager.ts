@@ -25,7 +25,7 @@ export class DeviceManager implements vscode.Disposable {
       100
     );
     this.statusBarItem.name = "Android Device";
-    this.statusBarItem.command = "android-runner.selectDevice";
+    this.statusBarItem.command = "mobile-runner.selectDevice";
     this.statusBarItem.tooltip = vscode.l10n.t("Select Android Device");
     this.disposables.push(this.statusBarItem);
 
@@ -228,7 +228,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     // Auto-select first online device if none selected
-    const config = vscode.workspace.getConfiguration("android-runner");
+    const config = vscode.workspace.getConfiguration("mobile-runner");
     if (!this.currentDevice && config.get<boolean>("autoSelectDevice", true)) {
       const firstOnline = this.devices.find((d) => d.isOnline);
       if (firstOnline) {

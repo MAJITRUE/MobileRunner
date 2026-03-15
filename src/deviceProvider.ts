@@ -23,7 +23,7 @@ export class DeviceProvider {
   }
 
   private resolveSdkPath(): string | undefined {
-    const config = vscode.workspace.getConfiguration("android-runner");
+    const config = vscode.workspace.getConfiguration("mobile-runner");
     const configPath = config.get<string>("sdkPath");
     if (configPath) {
       return configPath;
@@ -157,13 +157,13 @@ export class DeviceProvider {
       if (!this.sdkPath) {
         const openSettings = vscode.l10n.t("Open Settings");
         vscode.window.showErrorMessage(
-          vscode.l10n.t("Android SDK not found. Set android-runner.sdkPath or the ANDROID_HOME environment variable."),
+          vscode.l10n.t("Android SDK not found. Set mobile-runner.sdkPath or the ANDROID_HOME environment variable."),
           openSettings
         ).then((selection) => {
           if (selection === openSettings) {
             vscode.commands.executeCommand(
               "workbench.action.openSettings",
-              "android-runner.sdkPath"
+              "mobile-runner.sdkPath"
             );
           }
         });

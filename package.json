@@ -34,31 +34,30 @@
   "contributes": {
     "commands": [
       {
-        "command": "android-runner.selectDevice",
+        "command": "mobile-runner.selectDevice",
         "title": "%command.selectDevice%"
       },
       {
-        "command": "android-runner.run",
+        "command": "mobile-runner.run",
         "title": "%command.run%"
       },
       {
-        "command": "android-runner.stop",
+        "command": "mobile-runner.stop",
         "title": "%command.stop%"
       },
       {
-        "command": "android-runner.installAndRun",
+        "command": "mobile-runner.installAndRun",
         "title": "%command.installAndRun%"
       },
       {
-        "command": "android-runner.filterLog",
+        "command": "mobile-runner.filterLog",
         "title": "%command.filterLog%"
       }
     ],
     "debuggers": [
       {
-        "type": "android-runner",
-        "label": "Android Runner",
-        "languages": ["kotlin", "java"],
+        "type": "mobile-runner",
+        "label": "Android Build & Run",
         "configurationAttributes": {
           "launch": {
             "properties": {}
@@ -69,27 +68,27 @@
     "configuration": {
       "title": "Android Runner",
       "properties": {
-        "android-runner.sdkPath": {
+        "mobile-runner.sdkPath": {
           "type": "string",
           "default": "",
           "description": "%config.sdkPath.description%"
         },
-        "android-runner.javaHome": {
+        "mobile-runner.javaHome": {
           "type": "string",
           "default": "",
           "description": "%config.javaHome.description%"
         },
-        "android-runner.appModule": {
+        "mobile-runner.appModule": {
           "type": "string",
           "default": "app",
           "description": "%config.appModule.description%"
         },
-        "android-runner.buildVariant": {
+        "mobile-runner.buildVariant": {
           "type": "string",
           "default": "debug",
           "description": "%config.buildVariant.description%"
         },
-        "android-runner.autoSelectDevice": {
+        "mobile-runner.autoSelectDevice": {
           "type": "boolean",
           "default": true,
           "description": "%config.autoSelectDevice.description%"
