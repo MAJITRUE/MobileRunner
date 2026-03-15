@@ -66,6 +66,16 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Internal: called from debug adapter launch handler (F5)
+  // Silently skips if already running (prevents circular call from startDebugSession)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mobile-runner._launchFromDebug", () => {
+      if (!buildRunner?.getIsRunning()) {
+        buildRunner?.installAndRun(true);
+      }
+    })
+  );
+
   // Capture debug session when it starts
   context.subscriptions.push(
     vscode.debug.onDidStartDebugSession((session) => {
@@ -128,13 +138,19 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
           break;
         case "launch":
           this.sendResponse(message, {});
+          // Trigger build (skipDebugSession=true since session already exists)
+          vscode.commands.executeCommand("mobile-runner._launchFromDebug");
           break;
         case "restart":
           this.sendResponse(message, {});
           vscode.commands.executeCommand("mobile-runner.restart");
           break;
-        case "disconnect":
         case "terminate":
+          this.sendResponse(message, {});
+          // Signal VSCode that we're done
+          this.sendTerminated();
+          break;
+        case "disconnect":
           this.sendResponse(message, {});
           break;
         case "threads":

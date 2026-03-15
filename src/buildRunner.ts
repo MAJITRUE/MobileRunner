@@ -298,12 +298,12 @@ export class BuildRunner implements vscode.Disposable {
         await this.startDebugSession(currentDevice.name);
       }
     } catch (error) {
-      if (this.buildCancelled) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg === "cancelled" || this.buildCancelled) {
         this.buildCancelled = false;
         this.outputChannel.info(vscode.l10n.t("■ Build cancelled"));
         return;
       }
-      const msg = error instanceof Error ? error.message : String(error);
       this.outputChannel.error(`✗ ${msg}`);
       vscode.window.showErrorMessage(`Android Runner: ${msg}`);
       this.setRunning(false);
@@ -334,6 +334,10 @@ export class BuildRunner implements vscode.Disposable {
   /**
    * Called when a mobile-runner debug session starts (captured via onDidStartDebugSession)
    */
+  public getIsRunning(): boolean {
+    return this.isRunning;
+  }
+
   public onDebugSessionStarted(session: vscode.DebugSession): void {
     this.debugSession = session;
   }
@@ -595,8 +599,11 @@ export class BuildRunner implements vscode.Disposable {
         if (code === 0) {
           this.outputChannel.info(vscode.l10n.t("✓ Build successful"));
           resolve();
+        } else if (code === null) {
+          // Process was killed (user stopped) — silently reject
+          reject(new Error("cancelled"));
         } else {
-          reject(new Error(vscode.l10n.t("Gradle build failed with exit code {0}", code ?? -1)));
+          reject(new Error(vscode.l10n.t("Gradle build failed with exit code {0}", code)));
         }
       });
 
