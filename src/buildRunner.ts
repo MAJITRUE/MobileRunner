@@ -35,7 +35,7 @@ export class BuildRunner implements vscode.Disposable {
     this.runStatusBarItem.name = "Android Run";
     this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
     this.runStatusBarItem.tooltip = vscode.l10n.t("Build and run Android app");
-    this.runStatusBarItem.command = "mobile-runner.installAndRun";
+    this.runStatusBarItem.command = "native-runner.installAndRun";
     this.runStatusBarItem.show();
     this.disposables.push(this.runStatusBarItem);
 
@@ -58,7 +58,7 @@ export class BuildRunner implements vscode.Disposable {
     this.stopStatusBarItem.name = "Android Stop";
     this.stopStatusBarItem.text = `$(debug-stop) ${vscode.l10n.t("Stop")}`;
     this.stopStatusBarItem.tooltip = vscode.l10n.t("Stop running app");
-    this.stopStatusBarItem.command = "mobile-runner.stop";
+    this.stopStatusBarItem.command = "native-runner.stop";
     this.disposables.push(this.stopStatusBarItem);
   }
 
@@ -96,7 +96,7 @@ export class BuildRunner implements vscode.Disposable {
    * Find the APK after a successful build
    */
   private getAppModule(): string {
-    const config = vscode.workspace.getConfiguration("mobile-runner");
+    const config = vscode.workspace.getConfiguration("native-runner");
     return config.get<string>("appModule", "app");
   }
 
@@ -217,7 +217,7 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration("mobile-runner");
+    const config = vscode.workspace.getConfiguration("native-runner");
     const variant = config.get<string>("buildVariant", "debug");
     const capitalizedVariant = variant.charAt(0).toUpperCase() + variant.slice(1);
 
@@ -332,7 +332,7 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   /**
-   * Called when a mobile-runner debug session starts (captured via onDidStartDebugSession)
+   * Called when a native-runner debug session starts (captured via onDidStartDebugSession)
    */
   public getIsRunning(): boolean {
     return this.isRunning;
@@ -349,7 +349,7 @@ export class BuildRunner implements vscode.Disposable {
     await this.endDebugSession();
 
     await vscode.debug.startDebugging(undefined, {
-      type: "mobile-runner",
+      type: "native-runner",
       name: `Android: ${deviceName}`,
       request: "launch",
     });
@@ -405,7 +405,7 @@ export class BuildRunner implements vscode.Disposable {
     // 2. Also force-stop via API (belt and suspenders)
     try {
       const active = vscode.debug.activeDebugSession;
-      if (active?.type === "mobile-runner") {
+      if (active?.type === "native-runner") {
         await vscode.debug.stopDebugging(active);
       }
     } catch {
@@ -443,7 +443,7 @@ export class BuildRunner implements vscode.Disposable {
    */
   private detectJavaHome(): string | undefined {
     // 1. Plugin setting (highest priority)
-    const config = vscode.workspace.getConfiguration("mobile-runner");
+    const config = vscode.workspace.getConfiguration("native-runner");
     const configJavaHome = config.get<string>("javaHome");
     if (configJavaHome && fs.existsSync(configJavaHome)) {
       return configJavaHome;
@@ -555,13 +555,13 @@ export class BuildRunner implements vscode.Disposable {
         this.outputChannel.warn(vscode.l10n.t("JAVA_HOME not found. Build may fail."));
         const openSettings = vscode.l10n.t("Open Settings");
         vscode.window.showWarningMessage(
-          vscode.l10n.t("JDK not found. Set mobile-runner.javaHome or install a JDK."),
+          vscode.l10n.t("JDK not found. Set native-runner.javaHome or install a JDK."),
           openSettings
         ).then((selection) => {
           if (selection === openSettings) {
             vscode.commands.executeCommand(
               "workbench.action.openSettings",
-              "mobile-runner.javaHome"
+              "native-runner.javaHome"
             );
           }
         });

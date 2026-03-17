@@ -1,8 +1,8 @@
 {
-  "name": "mobile-runner",
+  "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {
@@ -34,29 +34,29 @@
   "contributes": {
     "commands": [
       {
-        "command": "mobile-runner.selectDevice",
+        "command": "native-runner.selectDevice",
         "title": "%command.selectDevice%"
       },
       {
-        "command": "mobile-runner.run",
+        "command": "native-runner.run",
         "title": "%command.run%"
       },
       {
-        "command": "mobile-runner.stop",
+        "command": "native-runner.stop",
         "title": "%command.stop%"
       },
       {
-        "command": "mobile-runner.installAndRun",
+        "command": "native-runner.installAndRun",
         "title": "%command.installAndRun%"
       },
       {
-        "command": "mobile-runner.filterLog",
+        "command": "native-runner.filterLog",
         "title": "%command.filterLog%"
       }
     ],
     "debuggers": [
       {
-        "type": "mobile-runner",
+        "type": "native-runner",
         "label": "Android Build & Run",
         "configurationAttributes": {
           "launch": {
@@ -68,27 +68,27 @@
     "configuration": {
       "title": "Android Runner",
       "properties": {
-        "mobile-runner.sdkPath": {
+        "native-runner.sdkPath": {
           "type": "string",
           "default": "",
           "description": "%config.sdkPath.description%"
         },
-        "mobile-runner.javaHome": {
+        "native-runner.javaHome": {
           "type": "string",
           "default": "",
           "description": "%config.javaHome.description%"
         },
-        "mobile-runner.appModule": {
+        "native-runner.appModule": {
           "type": "string",
           "default": "app",
           "description": "%config.appModule.description%"
         },
-        "mobile-runner.buildVariant": {
+        "native-runner.buildVariant": {
           "type": "string",
           "default": "debug",
           "description": "%config.buildVariant.description%"
         },
-        "mobile-runner.autoSelectDevice": {
+        "native-runner.autoSelectDevice": {
           "type": "boolean",
           "default": true,
           "description": "%config.autoSelectDevice.description%"

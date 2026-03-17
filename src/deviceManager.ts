@@ -25,7 +25,7 @@ export class DeviceManager implements vscode.Disposable {
       100
     );
     this.statusBarItem.name = "Android Device";
-    this.statusBarItem.command = "mobile-runner.selectDevice";
+    this.statusBarItem.command = "native-runner.selectDevice";
     this.statusBarItem.tooltip = vscode.l10n.t("Select Android Device");
     this.disposables.push(this.statusBarItem);
 
@@ -177,26 +177,37 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   private async launchAndWaitForEmulator(emulator: AvdEmulator): Promise<AndroidDevice | undefined> {
+    const maxWaitSeconds = 120;
+    let cancelled = false;
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: vscode.l10n.t("Launching emulator: {0}...", emulator.name),
-        cancellable: false,
+        cancellable: true,
       },
-      async () => {
+      async (progress, token) => {
+        token.onCancellationRequested(() => { cancelled = true; });
+
         await this.deviceProvider.launchEmulator(emulator.id);
 
-        // Wait for the emulator to appear in adb devices (up to 60 seconds)
-        for (let i = 0; i < 60; i++) {
-          await this.sleep(1000);
-          await this.refreshDevices();
-          const newDevice = this.devices.find(
+        // Wait for the emulator to appear in adb devices
+        for (let i = 0; i < maxWaitSeconds; i++) {
+          if (cancelled) { return; }
+          await this.sleep(2000);
+          const devices = await this.deviceProvider.getConnectedDevices();
+          this.devices = devices;
+          this.updateStatusBar();
+          const newDevice = devices.find(
             (d) => d.type === "emulator" && d.isOnline
           );
           if (newDevice) {
             this.selectDevice(newDevice);
             return;
           }
+          progress.report({
+            message: vscode.l10n.t("{0}s — {1} device(s) found", (i + 1) * 2, devices.length),
+          });
         }
 
         vscode.window.showWarningMessage(
@@ -228,7 +239,7 @@ export class DeviceManager implements vscode.Disposable {
     }
 
     // Auto-select first online device if none selected
-    const config = vscode.workspace.getConfiguration("mobile-runner");
+    const config = vscode.workspace.getConfiguration("native-runner");
     if (!this.currentDevice && config.get<boolean>("autoSelectDevice", true)) {
       const firstOnline = this.devices.find((d) => d.isOnline);
       if (firstOnline) {
