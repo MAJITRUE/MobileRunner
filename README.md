@@ -11,6 +11,7 @@ Build, install, and run Android native projects directly from VSCode — no Andr
   ![Device Picker](images/device-picker.png)
 
 - **One-Click Run** — Click `▶ Run` in the status bar to build, install, and launch your app.
+- **Multi-Device** — Run the app on multiple devices at the same time. Each device gets its own logcat Output Channel.
 - **Build Variant Selector** — Auto-scans Gradle build variants (`debug`, `release`, flavors). Click to switch.
 - **Emulator Cold Boot** — Restart an emulator from scratch without leaving VSCode.
 - **Logcat in Debug Console** — App logs streamed to the Debug Console, filtered by your app's PID.
@@ -42,7 +43,7 @@ Build, install, and run Android native projects directly from VSCode — no Andr
 |------|-------------|
 | `📦 debug` | Current build variant. Click to change. |
 | `▶ Run` | Build, install, and launch. Shows spinner during build. |
-| `⬜ Stop` | Stop the running app. |
+| `⬜ Stop` | Stop the app on the selected device. |
 | `📱 Pixel 7` | Selected device. Click to open device picker. |
 
 ## Extension Settings

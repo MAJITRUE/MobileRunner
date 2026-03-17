@@ -7,15 +7,23 @@ import { DeviceManager } from "./deviceManager";
 import { VariantManager } from "./variantManager";
 import { getDebugAdapter } from "./extension";
 
+interface DeviceSession {
+  deviceId: string;
+  deviceName: string;
+  packageName: string;
+  logcatProcess: cp.ChildProcess;
+  outputChannel: vscode.OutputChannel;
+}
+
 export class BuildRunner implements vscode.Disposable {
   public readonly outputChannel: vscode.LogOutputChannel;
   private buildProcess: cp.ChildProcess | undefined;
-  private logcatProcess: cp.ChildProcess | undefined;
+  private sessions = new Map<string, DeviceSession>();
   private runStatusBarItem: vscode.StatusBarItem;
   private buildingStatusBarItem: vscode.StatusBarItem;
   private stopStatusBarItem: vscode.StatusBarItem;
-  private isRunning = false;
-  private lastPackageName: string | undefined;
+  private isBuildInProgress = false;
+  private lastLaunchedDeviceId: string | undefined;
   private logFilter: string | undefined;
   private debugSession: vscode.DebugSession | undefined;
   private disposables: vscode.Disposable[] = [];
@@ -62,6 +70,11 @@ export class BuildRunner implements vscode.Disposable {
     this.stopStatusBarItem.tooltip = vscode.l10n.t("Stop running app");
     this.stopStatusBarItem.command = "native-runner.stop";
     this.disposables.push(this.stopStatusBarItem);
+
+    // Update status bar when device selection changes
+    this.disposables.push(
+      this.deviceManager.onDeviceChanged(() => this.updateStatusBar())
+    );
   }
 
   /**
@@ -192,8 +205,14 @@ export class BuildRunner implements vscode.Disposable {
    * @param skipDebugSession - skip starting a new debug session (used on restart)
    */
   public async installAndRun(skipDebugSession = false): Promise<void> {
-    if (this.isRunning) {
+    if (this.isBuildInProgress) {
       vscode.window.showWarningMessage(vscode.l10n.t("Build is already in progress."));
+      return;
+    }
+
+    // Prevent double-launch from DAP launch handler
+    const currentDev = this.deviceManager.getCurrentDevice();
+    if (skipDebugSession && currentDev && this.sessions.has(currentDev.id)) {
       return;
     }
 
@@ -219,13 +238,17 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
+    // If this device already has a running session, tear it down first
+    await this.stopDevice(currentDevice.id);
+
     const variant = this.variantManager.getSelectedVariant();
     const capitalizedVariant = variant.charAt(0).toUpperCase() + variant.slice(1);
 
     this.outputChannel.clear();
     this.outputChannel.show(true);
     this.buildCancelled = false;
-    this.setRunning(true);
+    this.isBuildInProgress = true;
+    this.updateStatusBar();
 
     try {
       // Step 1: Build
@@ -253,7 +276,6 @@ export class BuildRunner implements vscode.Disposable {
         throw new Error(vscode.l10n.t("Could not determine package name from AndroidManifest.xml"));
       }
 
-      this.lastPackageName = pkgInfo.packageName;
       this.outputChannel.info(vscode.l10n.t("▶ Launching {0}...", pkgInfo.packageName));
       await this.deviceProvider.launchActivity(
         currentDevice.id,
@@ -262,9 +284,12 @@ export class BuildRunner implements vscode.Disposable {
       );
       this.outputChannel.info(vscode.l10n.t("✓ Launched"));
 
-      // Step 5: Start logcat (filtered by app PID)
-      this.outputChannel.info("--- Logcat ---");
-      this.stopLogcat();
+      // Step 5: Start logcat in per-device Output Channel
+      const deviceOutputChannel = vscode.window.createOutputChannel(
+        `Logcat: ${currentDevice.name}`
+      );
+      deviceOutputChannel.show(true);
+
       // Wait for app process to start, retry up to 3 times
       let pid: string | undefined;
       for (let i = 0; i < 3; i++) {
@@ -273,26 +298,41 @@ export class BuildRunner implements vscode.Disposable {
         if (pid) { break; }
       }
       if (pid) {
-        this.outputChannel.info(vscode.l10n.t("(filtered by PID {0})", pid));
+        deviceOutputChannel.appendLine(vscode.l10n.t("(filtered by PID {0})", pid));
       } else {
-        this.outputChannel.warn(vscode.l10n.t("Could not get app PID, showing all logs"));
+        deviceOutputChannel.appendLine(vscode.l10n.t("Could not get app PID, showing all logs"));
       }
-      this.logcatProcess = this.deviceProvider.startLogcat(
+
+      const targetDeviceId = currentDevice.id;
+      const logcatProcess = this.deviceProvider.startLogcat(
         currentDevice.id,
         pid,
         (text, category) => {
-          const adapter = getDebugAdapter();
-          if (adapter) {
-            adapter.writeToConsole(text, category);
-          } else {
-            // Fallback to output channel
-            this.outputChannel.info(text);
+          deviceOutputChannel.appendLine(text);
+          // Only send to DAP debug console for the most recently launched device
+          if (this.lastLaunchedDeviceId === targetDeviceId) {
+            const adapter = getDebugAdapter();
+            if (adapter) {
+              adapter.writeToConsole(text, category);
+            }
           }
         }
       );
 
-      // Build done — hide Building, keep Stop only
-      this.setBuildDone();
+      this.lastLaunchedDeviceId = currentDevice.id;
+
+      // Register device session
+      this.sessions.set(currentDevice.id, {
+        deviceId: currentDevice.id,
+        deviceName: currentDevice.name,
+        packageName: pkgInfo.packageName,
+        logcatProcess,
+        outputChannel: deviceOutputChannel,
+      });
+
+      // Build done — update status bar (show Run + Stop)
+      this.isBuildInProgress = false;
+      this.updateStatusBar();
 
       // Start debug session for floating toolbar (skip on restart and if already active)
       if (!skipDebugSession && !this.debugSession) {
@@ -303,11 +343,14 @@ export class BuildRunner implements vscode.Disposable {
       if (msg === "cancelled" || this.buildCancelled) {
         this.buildCancelled = false;
         this.outputChannel.info(vscode.l10n.t("■ Build cancelled"));
+        this.isBuildInProgress = false;
+        this.updateStatusBar();
         return;
       }
       this.outputChannel.error(`✗ ${msg}`);
       vscode.window.showErrorMessage(`Android Runner: ${msg}`);
-      this.setRunning(false);
+      this.isBuildInProgress = false;
+      this.updateStatusBar();
     }
   }
 
@@ -336,7 +379,7 @@ export class BuildRunner implements vscode.Disposable {
    * Called when a native-runner debug session starts (captured via onDidStartDebugSession)
    */
   public getIsRunning(): boolean {
-    return this.isRunning;
+    return this.isBuildInProgress || this.sessions.size > 0;
   }
 
   public onDebugSessionStarted(session: vscode.DebugSession): void {
@@ -358,20 +401,14 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   /**
-   * Restart: stop app and logcat, rebuild and relaunch, keeping the same debug session
+   * Restart: stop app on current device, rebuild and relaunch, keeping the same debug session
    */
   public async restart(): Promise<void> {
     const device = this.deviceManager.getCurrentDevice();
-    if (device && this.lastPackageName) {
-      try {
-        await this.deviceProvider.stopApp(device.id, this.lastPackageName);
-      } catch {
-        // ignore
-      }
+    if (device) {
+      await this.stopDevice(device.id);
     }
-    this.stopLogcat();
     this.killBuild();
-    this.isRunning = false;
     await this.installAndRun(true);
   }
 
@@ -383,15 +420,79 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
     this.debugSession = undefined;
-    this.stopApp();
+    this.stopAll();
   }
 
   /**
-   * Stop the running app (from status bar Stop button)
+   * Stop running app(s) — single session stops directly, multiple shows picker
    */
   public async stop(): Promise<void> {
-    await this.stopApp();
-    await this.endDebugSession();
+    // If build is in progress, cancel it (don't touch other sessions)
+    if (this.isBuildInProgress) {
+      this.killBuild();
+      return;
+    }
+
+    if (this.sessions.size === 0) {
+      return;
+    }
+
+    // Stop the currently selected device
+    const currentDevice = this.deviceManager.getCurrentDevice();
+    if (currentDevice && this.sessions.has(currentDevice.id)) {
+      await this.stopDevice(currentDevice.id);
+    }
+
+    if (this.sessions.size === 0) {
+      await this.endDebugSession();
+    }
+  }
+
+  /**
+   * Stop a single device session
+   */
+  private async stopDevice(deviceId: string): Promise<void> {
+    const session = this.sessions.get(deviceId);
+    if (!session) { return; }
+
+    try {
+      await this.deviceProvider.stopApp(deviceId, session.packageName);
+    } catch {
+      // ignore
+    }
+
+    session.logcatProcess.kill();
+    session.outputChannel.appendLine(vscode.l10n.t("■ App stopped"));
+    session.outputChannel.dispose();
+    this.sessions.delete(deviceId);
+
+    this.outputChannel.info(
+      vscode.l10n.t("■ Stopped on {0}", session.deviceName)
+    );
+
+    this.updateStatusBar();
+  }
+
+  /**
+   * Stop all device sessions and cancel any running build
+   */
+  private async stopAll(): Promise<void> {
+    // Show "Stopping..." indicator
+    this.stopStatusBarItem.hide();
+    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Stopping...")}`;
+    this.buildingStatusBarItem.command = undefined;
+    this.buildingStatusBarItem.show();
+
+    const deviceIds = [...this.sessions.keys()];
+    for (const deviceId of deviceIds) {
+      await this.stopDevice(deviceId);
+    }
+    this.killBuild();
+
+    // Reset building text for next build
+    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
+    this.isBuildInProgress = false;
+    this.updateStatusBar();
   }
 
   private async endDebugSession(): Promise<void> {
@@ -414,31 +515,6 @@ export class BuildRunner implements vscode.Disposable {
     }
   }
 
-  private async stopApp(): Promise<void> {
-    // Show "Stopping..." (not clickable)
-    this.stopStatusBarItem.hide();
-    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Stopping...")}`;
-    this.buildingStatusBarItem.command = undefined;
-    this.buildingStatusBarItem.show();
-
-    const device = this.deviceManager.getCurrentDevice();
-    if (device && this.lastPackageName) {
-      try {
-        await this.deviceProvider.stopApp(device.id, this.lastPackageName);
-        this.outputChannel.info(vscode.l10n.t("■ App stopped"));
-      } catch {
-        // ignore
-      }
-    }
-
-    this.stopLogcat();
-    this.killBuild();
-
-    // Reset building text for next build
-    this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
-    this.setRunning(false);
-  }
-
   /**
    * Auto-detect JAVA_HOME from common locations
    */
@@ -458,7 +534,7 @@ export class BuildRunner implements vscode.Disposable {
     const isMac = process.platform === "darwin";
     const isWindows = process.platform === "win32";
 
-    // 2. Android Studio bundled JDK (most reliable for Android development)
+    // 3. Android Studio bundled JDK (most reliable for Android development)
     const androidStudioJdkPaths = isMac
       ? [
           "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
@@ -481,7 +557,7 @@ export class BuildRunner implements vscode.Disposable {
       }
     }
 
-    // 3. macOS: use /usr/libexec/java_home
+    // 4. macOS: use /usr/libexec/java_home
     if (isMac) {
       try {
         const result = cp.execSync("/usr/libexec/java_home 2>/dev/null", {
@@ -496,7 +572,7 @@ export class BuildRunner implements vscode.Disposable {
       }
     }
 
-    // 4. Common JDK install paths
+    // 5. Common JDK install paths
     const commonPaths = isMac
       ? [
           "/Library/Java/JavaVirtualMachines",
@@ -625,36 +701,40 @@ export class BuildRunner implements vscode.Disposable {
     }
   }
 
-  private stopLogcat(): void {
-    if (this.logcatProcess) {
-      this.logcatProcess.kill();
-      this.logcatProcess = undefined;
-    }
-  }
-
-  private setRunning(running: boolean): void {
-    this.isRunning = running;
-    if (running) {
-      // Building: hide Run, show Building + Stop
+  /**
+   * Update status bar based on current state
+   */
+  private updateStatusBar(): void {
+    if (this.isBuildInProgress) {
+      // Building: hide Run, show Building spinner + Stop
       this.runStatusBarItem.hide();
+      this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
+      this.buildingStatusBarItem.command = undefined;
       this.buildingStatusBarItem.show();
       this.stopStatusBarItem.show();
     } else {
-      // Idle: show Run, hide Building + Stop
-      this.runStatusBarItem.show();
+      const currentDevice = this.deviceManager.getCurrentDevice();
+      const currentDeviceRunning = currentDevice && this.sessions.has(currentDevice.id);
+      if (currentDeviceRunning) {
+        // Current device has a running session: hide Run, show Stop
+        this.runStatusBarItem.hide();
+        this.stopStatusBarItem.show();
+      } else {
+        // Current device is idle: show Run, hide Stop
+        this.runStatusBarItem.show();
+        this.stopStatusBarItem.hide();
+      }
       this.buildingStatusBarItem.hide();
-      this.stopStatusBarItem.hide();
     }
-  }
-
-  private setBuildDone(): void {
-    // App running: hide Building, keep Stop, keep Run hidden
-    this.buildingStatusBarItem.hide();
   }
 
   dispose(): void {
     this.killBuild();
-    this.stopLogcat();
+    for (const [, session] of this.sessions) {
+      session.logcatProcess.kill();
+      session.outputChannel.dispose();
+    }
+    this.sessions.clear();
     for (const d of this.disposables) {
       d.dispose();
     }

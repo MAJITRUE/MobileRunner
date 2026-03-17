@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 (2026-03-17)
+
+- **Multi-device support** — Run the app on multiple devices simultaneously
+- Per-device logcat Output Channels (`Logcat: Pixel 7`, `Logcat: emulator-5554`)
+- Stop button targets the currently selected device only
+- Status bar shows Run/Stop based on selected device's session state
+- DAP Debug Console shows logs from the most recently launched device
+- Build cancel no longer affects other running device sessions
+
 ## 0.2.0 (2026-03-17)
 
 - Build variant auto-scan via `gradlew tasks`

@@ -56,5 +56,8 @@
   "Failed to scan build variants: {0}": "ビルドバリアントのスキャン失敗: {0}",
   "Build Variants": "ビルドバリアント",
   "(current)": "(現在選択中)",
-  "Cold Boot": "コールドブート"
+  "Cold Boot": "コールドブート",
+  "Stop All": "すべて停止",
+  "Select device to stop": "停止するデバイスを選択",
+  "■ Stopped on {0}": "■ {0} で停止"
 }
