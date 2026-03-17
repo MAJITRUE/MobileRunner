@@ -93,19 +93,39 @@ export class DeviceManager implements vscode.Disposable {
     const items: DevicePickItem[] = [];
     const emulators = await this.deviceProvider.getAvailableEmulators();
 
-    // Connected devices
+    // Connected devices — split into Current Device + Available Devices
     const onlineDevices = this.devices.filter((d) => d.isOnline);
+    const currentId = this.currentDevice?.id;
+
     if (onlineDevices.length > 0) {
+      const currentOnline = onlineDevices.find((d) => d.id === currentId);
+      const otherOnline = onlineDevices.filter((d) => d.id !== currentId);
+
+      // "Available Devices" separator (shown at right edge, like Flutter)
       items.push({
-        label: vscode.l10n.t("Connected Devices"),
+        label: vscode.l10n.t("Available Devices"),
         kind: vscode.QuickPickItemKind.Separator,
       });
-      for (const device of onlineDevices) {
+
+      // Current Device first
+      if (currentOnline) {
+        const icon = currentOnline.type === "emulator" ? "$(device-mobile)" : "$(plug)";
+        const typeLabel = currentOnline.type === "emulator" ? "mobile" : "physical";
+        items.push({
+          label: `${icon} ${currentOnline.name}`,
+          description: `${currentOnline.id} — ${typeLabel}`,
+          detail: vscode.l10n.t("Current Device"),
+          device: currentOnline,
+        });
+      }
+
+      // Other online devices
+      for (const device of otherOnline) {
         const icon = device.type === "emulator" ? "$(device-mobile)" : "$(plug)";
+        const typeLabel = device.type === "emulator" ? "mobile" : "physical";
         items.push({
           label: `${icon} ${device.name}`,
-          description: device.id,
-          detail: device.type === "emulator" ? vscode.l10n.t("Emulator") : vscode.l10n.t("Physical Device"),
+          description: `${device.id} — ${typeLabel}`,
           device,
         });
       }
@@ -123,7 +143,7 @@ export class DeviceManager implements vscode.Disposable {
 
     if (offlineEmulators.length > 0) {
       items.push({
-        label: vscode.l10n.t("Available Emulators (not running)"),
+        label: vscode.l10n.t("Offline Emulators"),
         kind: vscode.QuickPickItemKind.Separator,
       });
       for (const emu of offlineEmulators) {

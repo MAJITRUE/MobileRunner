@@ -8,11 +8,23 @@ let deviceManager: DeviceManager | undefined;
 let buildRunner: BuildRunner | undefined;
 let variantManager: VariantManager | undefined;
 
-// Current debug adapter instance, accessible from BuildRunner
-let currentDebugAdapter: AndroidDebugAdapter | undefined;
+// Debug adapter instances, keyed by session name (e.g. "Android: Pixel 7")
+const debugAdapters = new Map<string, AndroidDebugAdapter>();
 
-export function getDebugAdapter(): AndroidDebugAdapter | undefined {
-  return currentDebugAdapter;
+export function getDebugAdapter(sessionName?: string): AndroidDebugAdapter | undefined {
+  if (sessionName) {
+    return debugAdapters.get(sessionName);
+  }
+  // Fallback: return the most recently added adapter
+  let last: AndroidDebugAdapter | undefined;
+  for (const adapter of debugAdapters.values()) {
+    last = adapter;
+  }
+  return last;
+}
+
+export function removeDebugAdapter(sessionName: string): void {
+  debugAdapters.delete(sessionName);
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -25,6 +37,29 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(deviceManager);
   context.subscriptions.push(variantManager);
   context.subscriptions.push(buildRunner);
+
+  // Guard: cancel F5 if already running; assign unique ID to bypass confirmOnStart dialog
+  context.subscriptions.push(
+    vscode.debug.registerDebugConfigurationProvider("native-runner", {
+      resolveDebugConfiguration(
+        _folder,
+        config
+      ): vscode.DebugConfiguration | undefined {
+        // Unique ID per launch — prevents VSCode's "already running" dialog
+        (config as any).__uniqueId = `session-${Math.random().toString(16).slice(2, 10)}`;
+
+        // Guard: silently cancel if already running or building
+        if (buildRunner?.getIsBuildInProgress()) {
+          return undefined;
+        }
+        const currentDevice = deviceManager?.getCurrentDevice();
+        if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) {
+          return undefined;
+        }
+        return config;
+      },
+    })
+  );
 
   // Register debug adapter for floating toolbar + debug console
   context.subscriptions.push(
@@ -78,12 +113,17 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Internal: called from debug adapter launch handler (F5)
-  // Silently skips if already running (prevents circular call from startDebugSession)
+  // Skip if build in progress or selected device already has a session
   context.subscriptions.push(
     vscode.commands.registerCommand("native-runner._launchFromDebug", () => {
-      if (!buildRunner?.getIsRunning()) {
-        buildRunner?.installAndRun(true);
+      if (buildRunner?.getIsBuildInProgress()) {
+        return;
       }
+      const currentDevice = deviceManager?.getCurrentDevice();
+      if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) {
+        return;
+      }
+      buildRunner?.installAndRun(true);
     })
   );
 
@@ -123,10 +163,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 class AndroidDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
   createDebugAdapterDescriptor(
-    _session: vscode.DebugSession
+    session: vscode.DebugSession
   ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-    const adapter = new AndroidDebugAdapter();
-    currentDebugAdapter = adapter;
+    const adapter = new AndroidDebugAdapter(session.name);
+    debugAdapters.set(session.name, adapter);
     return new vscode.DebugAdapterInlineImplementation(adapter);
   }
 }
@@ -135,6 +175,8 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
   private onDidSendMessageEmitter = new vscode.EventEmitter<any>();
   readonly onDidSendMessage = this.onDidSendMessageEmitter.event;
   private seq = 1;
+
+  constructor(public readonly sessionName: string) {}
 
   handleMessage(message: any): void {
     if (message.type === "request") {
@@ -215,12 +257,13 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
   }
 
   dispose(): void {
-    currentDebugAdapter = undefined;
+    debugAdapters.delete(this.sessionName);
     this.onDidSendMessageEmitter.dispose();
   }
 }
 
 export function deactivate() {
+  debugAdapters.clear();
   deviceManager = undefined;
   buildRunner = undefined;
   variantManager = undefined;

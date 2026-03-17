@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { DeviceProvider } from "./deviceProvider";
 import { DeviceManager } from "./deviceManager";
 import { VariantManager } from "./variantManager";
-import { getDebugAdapter } from "./extension";
+import { getDebugAdapter, removeDebugAdapter } from "./extension";
 
 interface DeviceSession {
   deviceId: string;
@@ -24,7 +24,6 @@ export class BuildRunner implements vscode.Disposable {
   private buildingStatusBarItem: vscode.StatusBarItem;
   private stopStatusBarItem: vscode.StatusBarItem;
   private isBuildInProgress = false;
-  private lastLaunchedDeviceId: string | undefined;
   private logFilter: string | undefined;
   private disposables: vscode.Disposable[] = [];
 
@@ -303,23 +302,19 @@ export class BuildRunner implements vscode.Disposable {
         deviceOutputChannel.appendLine(vscode.l10n.t("Could not get app PID, showing all logs"));
       }
 
-      const targetDeviceId = currentDevice.id;
+      const debugSessionName = `Android: ${currentDevice.name}`;
       const logcatProcess = this.deviceProvider.startLogcat(
         currentDevice.id,
         pid,
         (text, category) => {
           deviceOutputChannel.appendLine(text);
-          // Only send to DAP debug console for the most recently launched device
-          if (this.lastLaunchedDeviceId === targetDeviceId) {
-            const adapter = getDebugAdapter();
-            if (adapter) {
-              adapter.writeToConsole(text, category);
-            }
+          // Send to this device's DAP debug console
+          const adapter = getDebugAdapter(debugSessionName);
+          if (adapter) {
+            adapter.writeToConsole(text, category);
           }
         }
       );
-
-      this.lastLaunchedDeviceId = currentDevice.id;
 
       // Register device session
       this.sessions.set(currentDevice.id, {
@@ -378,8 +373,12 @@ export class BuildRunner implements vscode.Disposable {
   /**
    * Called when a native-runner debug session starts (captured via onDidStartDebugSession)
    */
-  public getIsRunning(): boolean {
-    return this.isBuildInProgress || this.sessions.size > 0;
+  public getIsBuildInProgress(): boolean {
+    return this.isBuildInProgress;
+  }
+
+  public hasSessionForDevice(deviceId: string): boolean {
+    return this.sessions.has(deviceId);
   }
 
   public onDebugSessionStarted(session: vscode.DebugSession): void {
@@ -420,10 +419,13 @@ export class BuildRunner implements vscode.Disposable {
    * Called when the debug session ends (floating toolbar stop button pressed)
    */
   public onDebugSessionEnded(session: vscode.DebugSession): void {
-    // Find and stop the device session that owns this debug session
+    // Find the device session that owns this debug session and stop its app
     for (const [deviceId, deviceSession] of this.sessions) {
       if (deviceSession.debugSession === session) {
+        // Clear the reference first to prevent circular stopDevice → stopDebugging
         deviceSession.debugSession = undefined;
+        removeDebugAdapter(session.name);
+        // Stop the app on this specific device
         this.stopDevice(deviceId);
         return;
       }
@@ -458,6 +460,11 @@ export class BuildRunner implements vscode.Disposable {
     const session = this.sessions.get(deviceId);
     if (!session) { return; }
 
+    // Remove from map FIRST to prevent circular calls:
+    // stopDevice → sendTerminated → onDidTerminateDebugSession → onDebugSessionEnded → stopDevice
+    this.sessions.delete(deviceId);
+
+    // Stop the app on device
     try {
       await this.deviceProvider.stopApp(deviceId, session.packageName);
     } catch {
@@ -470,14 +477,18 @@ export class BuildRunner implements vscode.Disposable {
 
     // End the per-device debug session
     if (session.debugSession) {
-      const adapter = getDebugAdapter();
+      const debugSessionName = `Android: ${session.deviceName}`;
+      const adapter = getDebugAdapter(debugSessionName);
       if (adapter) {
         adapter.sendTerminated();
       }
-      session.debugSession = undefined;
+      try {
+        await vscode.debug.stopDebugging(session.debugSession);
+      } catch {
+        // ignore — session may already be terminated
+      }
+      removeDebugAdapter(debugSessionName);
     }
-
-    this.sessions.delete(deviceId);
 
     this.outputChannel.info(
       vscode.l10n.t("■ Stopped on {0}", session.deviceName)

@@ -1,9 +1,18 @@
 # Changelog
 
+## 0.3.3 (2026-03-18)
+
+- Device picker UI improvements — Flutter-style layout with Current Device / Available Devices / Offline Emulators sections
+- F5 guard via `resolveDebugConfiguration` to silently skip when build in progress or device already running
+
 ## 0.3.2 (2026-03-18)
 
-- Per-device debug sessions — floating toolbar shows device selector dropdown
-- Toolbar stop/restart targets the selected device only (not all devices)
+- Per-device DAP debug sessions — floating toolbar shows device selector dropdown
+- Toolbar stop/restart targets only the corresponding device
+- Fixed: Stop on one device no longer affects other running devices
+- Fixed: Floating toolbar correctly removed when device is stopped
+- Fixed: F5 now works when other devices are running (targets selected device)
+- Debug adapter map (`debugAdapters`) replaces singleton for correct session isolation
 
 ## 0.3.1 (2026-03-17)
 
