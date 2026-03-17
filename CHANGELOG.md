@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 (2026-03-18)
+
+- Per-device debug sessions — floating toolbar shows device selector dropdown
+- Toolbar stop/restart targets the selected device only (not all devices)
+
 ## 0.3.1 (2026-03-17)
 
 - Fixed status bar order in README to match actual display

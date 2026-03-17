@@ -13,6 +13,7 @@ interface DeviceSession {
   packageName: string;
   logcatProcess: cp.ChildProcess;
   outputChannel: vscode.OutputChannel;
+  debugSession?: vscode.DebugSession;
 }
 
 export class BuildRunner implements vscode.Disposable {
@@ -25,7 +26,6 @@ export class BuildRunner implements vscode.Disposable {
   private isBuildInProgress = false;
   private lastLaunchedDeviceId: string | undefined;
   private logFilter: string | undefined;
-  private debugSession: vscode.DebugSession | undefined;
   private disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -334,8 +334,8 @@ export class BuildRunner implements vscode.Disposable {
       this.isBuildInProgress = false;
       this.updateStatusBar();
 
-      // Start debug session for floating toolbar (skip on restart and if already active)
-      if (!skipDebugSession && !this.debugSession) {
+      // Start debug session for floating toolbar (skip on restart)
+      if (!skipDebugSession) {
         await this.startDebugSession(currentDevice.name);
       }
     } catch (error) {
@@ -383,15 +383,19 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   public onDebugSessionStarted(session: vscode.DebugSession): void {
-    this.debugSession = session;
+    // Match session to device by name "Android: <deviceName>"
+    for (const [, deviceSession] of this.sessions) {
+      if (session.name === `Android: ${deviceSession.deviceName}`) {
+        deviceSession.debugSession = session;
+        break;
+      }
+    }
   }
 
   /**
    * Start a debug session to show the floating toolbar
    */
   private async startDebugSession(deviceName: string): Promise<void> {
-    await this.endDebugSession();
-
     await vscode.debug.startDebugging(undefined, {
       type: "native-runner",
       name: `Android: ${deviceName}`,
@@ -416,11 +420,14 @@ export class BuildRunner implements vscode.Disposable {
    * Called when the debug session ends (floating toolbar stop button pressed)
    */
   public onDebugSessionEnded(session: vscode.DebugSession): void {
-    if (this.debugSession !== session) {
-      return;
+    // Find and stop the device session that owns this debug session
+    for (const [deviceId, deviceSession] of this.sessions) {
+      if (deviceSession.debugSession === session) {
+        deviceSession.debugSession = undefined;
+        this.stopDevice(deviceId);
+        return;
+      }
     }
-    this.debugSession = undefined;
-    this.stopAll();
   }
 
   /**
@@ -442,10 +449,6 @@ export class BuildRunner implements vscode.Disposable {
     if (currentDevice && this.sessions.has(currentDevice.id)) {
       await this.stopDevice(currentDevice.id);
     }
-
-    if (this.sessions.size === 0) {
-      await this.endDebugSession();
-    }
   }
 
   /**
@@ -464,6 +467,16 @@ export class BuildRunner implements vscode.Disposable {
     session.logcatProcess.kill();
     session.outputChannel.appendLine(vscode.l10n.t("■ App stopped"));
     session.outputChannel.dispose();
+
+    // End the per-device debug session
+    if (session.debugSession) {
+      const adapter = getDebugAdapter();
+      if (adapter) {
+        adapter.sendTerminated();
+      }
+      session.debugSession = undefined;
+    }
+
     this.sessions.delete(deviceId);
 
     this.outputChannel.info(
@@ -495,25 +508,6 @@ export class BuildRunner implements vscode.Disposable {
     this.updateStatusBar();
   }
 
-  private async endDebugSession(): Promise<void> {
-    this.debugSession = undefined;
-
-    // 1. Send DAP terminated event
-    const adapter = getDebugAdapter();
-    if (adapter) {
-      adapter.sendTerminated();
-    }
-
-    // 2. Also force-stop via API (belt and suspenders)
-    try {
-      const active = vscode.debug.activeDebugSession;
-      if (active?.type === "native-runner") {
-        await vscode.debug.stopDebugging(active);
-      }
-    } catch {
-      // ignore
-    }
-  }
 
   /**
    * Auto-detect JAVA_HOME from common locations
