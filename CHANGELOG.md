@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 (2026-03-17)
+
+- Build variant auto-scan via `gradlew tasks`
+- Status bar variant selector with QuickPick UI
+- Emulator cold boot support (device picker bottom section)
+- Background variant scan on startup with spinner indicator
+- Renamed internal IDs from `mobile-runner` to `native-runner`
+
+## 0.1.1 (2026-03-17)
+
+- Renamed package to `native-runner` for Marketplace publishing
+
 ## 0.1.0 (2026-03-15)
 
 - Initial release
@@ -10,5 +22,7 @@
 - APK install and app launch
 - Logcat output in Debug Console with PID filtering
 - Floating debug toolbar (stop / restart)
-- Auto-detect Android SDK path (ANDROID_HOME, common locations)
-- Configurable build variant and SDK path
+- F5 support via launch.json
+- Auto-detect Android SDK and JDK paths
+- Configurable build variant, SDK path, JDK path, app module
+- i18n support (English / Japanese)

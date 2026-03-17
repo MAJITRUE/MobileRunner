@@ -189,12 +189,27 @@ export class DeviceProvider {
   }
 
   /**
+   * Kill a running emulator via adb
+   */
+  public async killEmulator(deviceId: string): Promise<void> {
+    try {
+      await this.exec(this.getAdbPath(), ["-s", deviceId, "emu", "kill"]);
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
    * Launch an AVD emulator
    */
-  public async launchEmulator(avdName: string): Promise<void> {
+  public async launchEmulator(avdName: string, coldBoot = false): Promise<void> {
     const emulatorPath = this.getEmulatorPath();
+    const args = ["-avd", avdName];
+    if (coldBoot) {
+      args.push("-no-snapshot-load");
+    }
     // Spawn detached so it doesn't block VSCode
-    const child = cp.spawn(emulatorPath, ["-avd", avdName], {
+    const child = cp.spawn(emulatorPath, args, {
       stdio: "ignore",
       windowsHide: true,
     });

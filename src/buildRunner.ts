@@ -4,10 +4,11 @@ import * as path from "path";
 import * as fs from "fs";
 import { DeviceProvider } from "./deviceProvider";
 import { DeviceManager } from "./deviceManager";
+import { VariantManager } from "./variantManager";
 import { getDebugAdapter } from "./extension";
 
 export class BuildRunner implements vscode.Disposable {
-  private outputChannel: vscode.LogOutputChannel;
+  public readonly outputChannel: vscode.LogOutputChannel;
   private buildProcess: cp.ChildProcess | undefined;
   private logcatProcess: cp.ChildProcess | undefined;
   private runStatusBarItem: vscode.StatusBarItem;
@@ -21,7 +22,8 @@ export class BuildRunner implements vscode.Disposable {
 
   constructor(
     private deviceProvider: DeviceProvider,
-    private deviceManager: DeviceManager
+    private deviceManager: DeviceManager,
+    private variantManager: VariantManager
   ) {
     this.outputChannel = vscode.window.createOutputChannel("Android Runner", { log: true });
     this.disposables.push(this.outputChannel);
@@ -217,8 +219,7 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration("native-runner");
-    const variant = config.get<string>("buildVariant", "debug");
+    const variant = this.variantManager.getSelectedVariant();
     const capitalizedVariant = variant.charAt(0).toUpperCase() + variant.slice(1);
 
     this.outputChannel.clear();

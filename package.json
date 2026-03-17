@@ -2,7 +2,7 @@
   "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {
@@ -52,6 +52,10 @@
       {
         "command": "native-runner.filterLog",
         "title": "%command.filterLog%"
+      },
+      {
+        "command": "native-runner.selectVariant",
+        "title": "%command.selectVariant%"
       }
     ],
     "debuggers": [

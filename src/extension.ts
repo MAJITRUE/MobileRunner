@@ -2,9 +2,11 @@ import * as vscode from "vscode";
 import { DeviceProvider } from "./deviceProvider";
 import { DeviceManager } from "./deviceManager";
 import { BuildRunner } from "./buildRunner";
+import { VariantManager } from "./variantManager";
 
 let deviceManager: DeviceManager | undefined;
 let buildRunner: BuildRunner | undefined;
+let variantManager: VariantManager | undefined;
 
 // Current debug adapter instance, accessible from BuildRunner
 let currentDebugAdapter: AndroidDebugAdapter | undefined;
@@ -16,9 +18,12 @@ export function getDebugAdapter(): AndroidDebugAdapter | undefined {
 export function activate(context: vscode.ExtensionContext) {
   const deviceProvider = new DeviceProvider();
   deviceManager = new DeviceManager(deviceProvider);
-  buildRunner = new BuildRunner(deviceProvider, deviceManager);
+  variantManager = new VariantManager();
+  buildRunner = new BuildRunner(deviceProvider, deviceManager, variantManager);
+  variantManager.setOutputChannel(buildRunner.outputChannel);
 
   context.subscriptions.push(deviceManager);
+  context.subscriptions.push(variantManager);
   context.subscriptions.push(buildRunner);
 
   // Register debug adapter for floating toolbar + debug console
@@ -66,6 +71,12 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("native-runner.selectVariant", () => {
+      variantManager?.showVariantPicker();
+    })
+  );
+
   // Internal: called from debug adapter launch handler (F5)
   // Silently skips if already running (prevents circular call from startDebugSession)
   context.subscriptions.push(
@@ -105,6 +116,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initial device refresh
   deviceManager.refreshDevices();
+
+  // Scan build variants in background (silent, no notification)
+  variantManager.triggerScan(true);
 }
 
 class AndroidDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
@@ -209,4 +223,5 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
 export function deactivate() {
   deviceManager = undefined;
   buildRunner = undefined;
+  variantManager = undefined;
 }

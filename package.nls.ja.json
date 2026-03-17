@@ -6,6 +6,7 @@
   "command.stop": "Android Runner: アプリを停止",
   "command.installAndRun": "Android Runner: ビルド・インストール・実行",
   "command.filterLog": "Android Runner: ログをフィルター",
+  "command.selectVariant": "Android Runner: ビルドバリアントを選択",
   "config.sdkPath.description": "Android SDK のパス。空の場合、ANDROID_HOME または ANDROID_SDK_ROOT 環境変数を使用します。",
   "config.javaHome.description": "JDK のパス。空の場合、JAVA_HOME、Android Studio、一般的なインストール先から自動検出します。",
   "config.appModule.description": "アプリモジュール名（例: app, mobile, wear）。デフォルト: app。",

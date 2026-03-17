@@ -4,6 +4,7 @@ import { AndroidDevice, AvdEmulator, DeviceProvider } from "./deviceProvider";
 interface DevicePickItem extends vscode.QuickPickItem {
   device?: AndroidDevice;
   emulator?: AvdEmulator;
+  coldBoot?: boolean;
   action?: "refresh";
 }
 
@@ -74,14 +75,9 @@ export class DeviceManager implements vscode.Disposable {
       return undefined;
     }
 
-    // Handle refresh action
-    if (selection.action === "refresh") {
-      return this.showDevicePicker();
-    }
-
     // Handle emulator launch
     if (selection.emulator) {
-      return this.launchAndWaitForEmulator(selection.emulator);
+      return this.launchAndWaitForEmulator(selection.emulator, selection.coldBoot);
     }
 
     // Handle device selection
@@ -132,8 +128,7 @@ export class DeviceManager implements vscode.Disposable {
       });
       for (const emu of offlineEmulators) {
         items.push({
-          label: `$(vm) ${emu.name}`,
-          description: vscode.l10n.t("Click to launch"),
+          label: `$(play) ${vscode.l10n.t("Start {0}", emu.name)}`,
           emulator: emu,
         });
       }
@@ -163,33 +158,70 @@ export class DeviceManager implements vscode.Disposable {
       });
     }
 
-    // Refresh option
-    items.push({
-      label: "",
-      kind: vscode.QuickPickItemKind.Separator,
-    });
-    items.push({
-      label: vscode.l10n.t("$(refresh) Refresh device list"),
-      action: "refresh",
-    });
+    // Cold boot section (at the bottom, separated)
+    const coldBootTargets: { name: string; emulator: AvdEmulator }[] = [];
+    // Running emulators
+    for (const device of onlineDevices.filter((d) => d.type === "emulator")) {
+      const avd = emulators.find((e) => e.name === device.name.replace(/ /g, "_"));
+      if (avd) {
+        coldBootTargets.push({ name: device.name, emulator: avd });
+      }
+    }
+    // Offline emulators
+    for (const emu of offlineEmulators) {
+      coldBootTargets.push({ name: emu.name, emulator: emu });
+    }
+    if (coldBootTargets.length > 0) {
+      items.push({
+        label: vscode.l10n.t("Cold Boot"),
+        kind: vscode.QuickPickItemKind.Separator,
+      });
+      for (const target of coldBootTargets) {
+        items.push({
+          label: `$(zap) ${target.name}`,
+          emulator: target.emulator,
+          coldBoot: true,
+        });
+      }
+    }
 
     return items;
   }
 
-  private async launchAndWaitForEmulator(emulator: AvdEmulator): Promise<AndroidDevice | undefined> {
+  private async launchAndWaitForEmulator(emulator: AvdEmulator, coldBoot = false): Promise<AndroidDevice | undefined> {
     const maxWaitSeconds = 120;
     let cancelled = false;
 
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: vscode.l10n.t("Launching emulator: {0}...", emulator.name),
+        title: coldBoot
+          ? vscode.l10n.t("Cold booting emulator: {0}...", emulator.name)
+          : vscode.l10n.t("Launching emulator: {0}...", emulator.name),
         cancellable: true,
       },
       async (progress, token) => {
         token.onCancellationRequested(() => { cancelled = true; });
 
-        await this.deviceProvider.launchEmulator(emulator.id);
+        // If cold booting a running emulator, kill it first
+        if (coldBoot) {
+          const runningDevice = this.devices.find(
+            (d) => d.type === "emulator" && d.isOnline && d.name.replace(/ /g, "_") === emulator.id
+          );
+          if (runningDevice) {
+            await this.deviceProvider.killEmulator(runningDevice.id);
+            // Wait for emulator to fully shut down
+            for (let i = 0; i < 15; i++) {
+              if (cancelled) { return; }
+              await this.sleep(1000);
+              const devices = await this.deviceProvider.getConnectedDevices();
+              const stillRunning = devices.find((d) => d.id === runningDevice.id && d.isOnline);
+              if (!stillRunning) { break; }
+            }
+          }
+        }
+
+        await this.deviceProvider.launchEmulator(emulator.id, coldBoot);
 
         // Wait for the emulator to appear in adb devices
         for (let i = 0; i < maxWaitSeconds; i++) {

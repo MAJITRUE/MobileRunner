@@ -6,6 +6,7 @@
   "command.stop": "Android Runner: Stop App",
   "command.installAndRun": "Android Runner: Build, Install & Run",
   "command.filterLog": "Android Runner: Filter Log",
+  "command.selectVariant": "Android Runner: Select Build Variant",
   "config.sdkPath.description": "Path to Android SDK. If empty, uses ANDROID_HOME or ANDROID_SDK_ROOT environment variable.",
   "config.javaHome.description": "Path to JDK. If empty, auto-detects from JAVA_HOME, Android Studio, or common install locations.",
   "config.appModule.description": "App module name (e.g., app, mobile, wear). Default: app.",
