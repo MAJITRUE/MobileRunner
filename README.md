@@ -36,15 +36,15 @@ Build, install, and run Android native projects directly from VSCode — no Andr
 ## Status Bar
 
 ```
-[📦 debug] [▶ Run] [⬜ Stop] [📱 Pixel 7]
+[📱 Pixel 7] [▶ Run] [📦 debug]
 ```
 
 | Item | Description |
 |------|-------------|
-| `📦 debug` | Current build variant. Click to change. |
-| `▶ Run` | Build, install, and launch. Shows spinner during build. |
-| `⬜ Stop` | Stop the app on the selected device. |
 | `📱 Pixel 7` | Selected device. Click to open device picker. |
+| `▶ Run` | Build, install, and launch. Shows spinner during build. |
+| `⬜ Stop` | Stop the app on the selected device. Visible only while running. |
+| `📦 debug` | Current build variant. Click to change. |
 
 ## Extension Settings
 
