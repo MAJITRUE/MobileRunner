@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-03-17)
+
+- Fixed status bar order in README to match actual display
+
 ## 0.3.0 (2026-03-17)
 
 - **Multi-device support** — Run the app on multiple devices simultaneously
