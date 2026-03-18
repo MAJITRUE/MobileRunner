@@ -297,10 +297,15 @@ export class DeviceManager implements vscode.Disposable {
     }
     this.devices = allDevices;
 
-    // Auto-deselect if current device is gone
+    // Auto-deselect only if current device is completely gone from list
     if (this.currentDevice) {
-      const stillExists = this.devices.find((d) => d.id === this.currentDevice!.id && d.isOnline);
-      if (!stillExists) { this.currentDevice = undefined; }
+      const stillExists = this.devices.find((d) => d.id === this.currentDevice!.id);
+      if (!stillExists) {
+        this.currentDevice = undefined;
+      } else {
+        // Update device state (online/offline) but keep selection
+        this.currentDevice = stillExists;
+      }
     }
 
     // Auto-select first online device if none selected

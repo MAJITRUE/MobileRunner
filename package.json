@@ -21,11 +21,16 @@
     "android",
     "ios",
     "xcode",
+    "xcodebuild",
     "emulator",
     "simulator",
     "adb",
     "gradle",
-    "device"
+    "device",
+    "mobile",
+    "native",
+    "build",
+    "run"
   ],
   "activationEvents": [
     "workspaceContains:**/build.gradle",

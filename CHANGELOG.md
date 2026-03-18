@@ -10,6 +10,11 @@
 - Common `PlatformProvider` interface — architecture refactored for multi-platform extensibility
 - New settings: `native-runner.iosScheme`, `native-runner.iosConfiguration`
 - Activation on `.xcodeproj` / `.xcworkspace` presence
+- Renamed display name to "Android / iOS Build & Run"
+- Bundle ID detection: 3-tier fallback (Info.plist → xcodebuild -showBuildSettings → project.pbxproj)
+- Smart build output: auto-show after 30s or on error, silent on success
+- Fixed: device auto-switching during build (keep selection unless device disappears)
+- Fixed: simulator/physical device detection for log streaming
 
 ## 0.3.3 (2026-03-18)
 

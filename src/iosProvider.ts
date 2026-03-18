@@ -7,6 +7,12 @@ import { Device, Emulator, PlatformProvider } from "./types";
 export class IosProvider implements PlatformProvider {
   readonly platform = "ios" as const;
 
+  /** Stores console-attached devicectl processes for physical device log streaming */
+  private consoleProcesses = new Map<string, cp.ChildProcess>();
+
+  /** Cached Xcode major version (e.g. 15, 16, 26) */
+  private xcodeVersion: number | undefined;
+
   public isAvailable(): boolean {
     // Check if xcrun (Xcode command line tools) is available
     try {
@@ -15,6 +21,24 @@ export class IosProvider implements PlatformProvider {
     } catch {
       return false;
     }
+  }
+
+  /** Detect and cache Xcode major version */
+  public getXcodeVersion(): number {
+    if (this.xcodeVersion !== undefined) { return this.xcodeVersion; }
+    try {
+      const output = cp.execFileSync("xcodebuild", ["-version"], { timeout: 5000 }).toString();
+      const match = output.match(/Xcode\s+(\d+)/);
+      this.xcodeVersion = match ? parseInt(match[1], 10) : 0;
+    } catch {
+      this.xcodeVersion = 0;
+    }
+    return this.xcodeVersion;
+  }
+
+  /** Check if devicectl (Xcode 15+) is available */
+  public hasDevicectl(): boolean {
+    return this.getXcodeVersion() >= 15;
   }
 
   // --- Device Detection ---
@@ -42,12 +66,16 @@ export class IosProvider implements PlatformProvider {
     const json = JSON.parse(output);
     const devices: Device[] = [];
 
+    // Update simulator UDID cache for isSimulatorSync()
+    this.simulatorUdids.clear();
+
     for (const [runtimeId, runtimeDevices] of Object.entries(json.devices || {})) {
       // Only include iOS runtimes (skip watchOS, tvOS, visionOS)
       if (!runtimeId.includes("iOS") && !runtimeId.includes("iphone")) { continue; }
 
       for (const sim of runtimeDevices as any[]) {
         if (sim.isAvailable === false) { continue; }
+        this.simulatorUdids.add(sim.udid);
         const isBooted = sim.state === "Booted";
         devices.push({
           id: sim.udid,
@@ -65,6 +93,9 @@ export class IosProvider implements PlatformProvider {
   }
 
   private async getPhysicalDevices(): Promise<Device[]> {
+    if (!this.hasDevicectl()) {
+      return this.getPhysicalDevicesViaXctrace();
+    }
     try {
       const output = await this.exec("xcrun", [
         "devicectl", "list", "devices",
@@ -241,6 +272,7 @@ export class IosProvider implements PlatformProvider {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const child = cp.spawn("xcodebuild", args, { cwd });
+      let stderrBuffer = "";
 
       child.stdout?.on("data", (data: Buffer) => {
         for (const line of data.toString().split("\n")) {
@@ -250,7 +282,9 @@ export class IosProvider implements PlatformProvider {
       });
 
       child.stderr?.on("data", (data: Buffer) => {
-        for (const line of data.toString().split("\n")) {
+        const text = data.toString();
+        stderrBuffer += text;
+        for (const line of text.split("\n")) {
           const t = line.trim();
           if (t) { outputChannel.warn(t); }
         }
@@ -263,7 +297,10 @@ export class IosProvider implements PlatformProvider {
         } else if (code === null) {
           reject(new Error("cancelled"));
         } else {
-          reject(new Error(vscode.l10n.t("xcodebuild failed with exit code {0}", code)));
+          const friendlyMsg = this.mapIosError(stderrBuffer);
+          reject(new Error(friendlyMsg !== stderrBuffer
+            ? friendlyMsg
+            : vscode.l10n.t("xcodebuild failed with exit code {0}", code)));
         }
       });
 
@@ -274,15 +311,18 @@ export class IosProvider implements PlatformProvider {
   // --- Install / Launch / Stop ---
 
   public async installApp(deviceId: string, appPath: string): Promise<void> {
-    // Determine if simulator or physical device
     const isSimulator = await this.isSimulator(deviceId);
-    if (isSimulator) {
-      await this.exec("xcrun", ["simctl", "install", deviceId, appPath], 120000);
-    } else {
-      await this.exec("xcrun", [
-        "devicectl", "device", "install", "app",
-        "--device", deviceId, appPath,
-      ], 120000);
+    try {
+      if (isSimulator) {
+        await this.exec("xcrun", ["simctl", "install", deviceId, appPath], 120000);
+      } else {
+        await this.exec("xcrun", [
+          "devicectl", "device", "install", "app",
+          "--device", deviceId, appPath,
+        ], 120000);
+      }
+    } catch (e: any) {
+      throw new Error(this.mapIosError(e.message || String(e)));
     }
   }
 
@@ -291,11 +331,59 @@ export class IosProvider implements PlatformProvider {
     if (isSimulator) {
       await this.exec("xcrun", ["simctl", "launch", deviceId, bundleId]);
     } else {
-      await this.exec("xcrun", [
-        "devicectl", "device", "process", "launch",
-        "--device", deviceId, bundleId,
-      ]);
+      // Launch with --console to enable log streaming from physical devices.
+      // The process stays alive until the app terminates, streaming logs to stdout.
+      await this.launchWithConsole(deviceId, bundleId);
     }
+  }
+
+  private launchWithConsole(deviceId: string, bundleId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = cp.spawn("xcrun", [
+        "devicectl", "device", "process", "launch",
+        "--device", deviceId,
+        "--console",
+        "--environment-variables", JSON.stringify({ OS_ACTIVITY_DT_MODE: "enable" }),
+        bundleId,
+      ]);
+
+      let launched = false;
+      const timeout = setTimeout(() => {
+        if (!launched) {
+          // Even if we don't see the marker, assume launch succeeded after 10s
+          launched = true;
+          this.consoleProcesses.set(deviceId, child);
+          resolve();
+        }
+      }, 10000);
+
+      const onData = (data: Buffer) => {
+        const text = data.toString();
+        // devicectl prints this line when launch completes and it starts waiting
+        if (!launched && text.includes("Waiting for the application to terminate")) {
+          launched = true;
+          clearTimeout(timeout);
+          this.consoleProcesses.set(deviceId, child);
+          resolve();
+        }
+      };
+
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+
+      child.on("error", (err) => {
+        clearTimeout(timeout);
+        if (!launched) { reject(err); }
+      });
+
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        this.consoleProcesses.delete(deviceId);
+        if (!launched) {
+          reject(new Error(`devicectl launch exited with code ${code}`));
+        }
+      });
+    });
   }
 
   public async stopApp(deviceId: string, bundleId: string): Promise<void> {
@@ -305,7 +393,13 @@ export class IosProvider implements PlatformProvider {
         await this.exec("xcrun", ["simctl", "terminate", deviceId, bundleId]);
       } catch { /* app may not be running */ }
     } else {
-      // Physical device — try devicectl
+      // Clean up console process (kills the app since it's console-attached)
+      const consoleProc = this.consoleProcesses.get(deviceId);
+      if (consoleProc) {
+        this.consoleProcesses.delete(deviceId);
+        consoleProc.kill();
+      }
+      // Also explicitly terminate via devicectl as a fallback
       try {
         await this.exec("xcrun", [
           "devicectl", "device", "process", "terminate",
@@ -322,15 +416,56 @@ export class IosProvider implements PlatformProvider {
     _pid?: string,
     writeToConsole?: (text: string, category: "stdout" | "stderr") => void
   ): cp.ChildProcess {
-    // For simulators, use simctl spawn log stream
-    // For physical devices, use log stream --device
-    const args = this.isSimulatorSync(deviceId)
-      ? ["simctl", "spawn", deviceId, "log", "stream", "--style", "compact", "--level", "default"]
-      : ["--device", deviceId, "log", "stream", "--style", "compact", "--level", "default"];
+    const isSimulator = this.isSimulatorSync(deviceId);
 
-    const cmd = this.isSimulatorSync(deviceId) ? "xcrun" : "log";
-    const child = cp.spawn(cmd, args);
+    if (!isSimulator) {
+      // Physical device: reuse the console-attached process from launchApp()
+      const consoleProc = this.consoleProcesses.get(deviceId);
+      if (consoleProc) {
+        this.attachLogHandlers(consoleProc, writeToConsole);
+        return consoleProc;
+      }
+      // Fallback: try idevicesyslog (libimobiledevice, works on Xcode < 26)
+      return this.startPhysicalDeviceLogFallback(deviceId, writeToConsole);
+    }
 
+    // Simulator: use simctl spawn log stream
+    const child = cp.spawn("xcrun", [
+      "simctl", "spawn", deviceId, "log", "stream",
+      "--style", "compact", "--level", "default",
+    ]);
+
+    this.attachLogHandlers(child, writeToConsole);
+    return child;
+  }
+
+  private startPhysicalDeviceLogFallback(
+    deviceId: string,
+    writeToConsole?: (text: string, category: "stdout" | "stderr") => void
+  ): cp.ChildProcess {
+    // Try idevicesyslog first (libimobiledevice)
+    try {
+      cp.execFileSync("which", ["idevicesyslog"], { timeout: 2000, stdio: "ignore" });
+      const child = cp.spawn("idevicesyslog", ["-u", deviceId]);
+      this.attachLogHandlers(child, writeToConsole);
+      return child;
+    } catch { /* idevicesyslog not available */ }
+
+    // Last resort: spawn a dummy process that outputs a message
+    if (writeToConsole) {
+      writeToConsole(
+        vscode.l10n.t("Log streaming not available for this device. Console-attached process was not created."),
+        "stderr",
+      );
+    }
+    // Return a no-op process (cat /dev/null exits immediately but is a valid ChildProcess)
+    return cp.spawn("cat", ["/dev/null"]);
+  }
+
+  private attachLogHandlers(
+    child: cp.ChildProcess,
+    writeToConsole?: (text: string, category: "stdout" | "stderr") => void
+  ): void {
     child.stdout?.on("data", (data: Buffer) => {
       for (const line of data.toString().split("\n")) {
         const trimmed = line.trim();
@@ -345,8 +480,6 @@ export class IosProvider implements PlatformProvider {
     child.stderr?.on("data", (data: Buffer) => {
       if (writeToConsole) { writeToConsole(data.toString(), "stderr"); }
     });
-
-    return child;
   }
 
   public async getAppPid(deviceId: string, bundleId: string): Promise<string | undefined> {
@@ -360,6 +493,22 @@ export class IosProvider implements PlatformProvider {
           if (line.includes(bundleId)) {
             const parts = line.trim().split(/\s+/);
             if (parts[0] && /^\d+$/.test(parts[0])) { return parts[0]; }
+          }
+        }
+      } else {
+        // Physical device: query running processes via devicectl
+        const output = await this.exec("xcrun", [
+          "devicectl", "device", "info", "processes",
+          "--device", deviceId,
+          "--json-output", "/dev/stdout",
+        ], 15000);
+        const json = JSON.parse(output);
+        const processes: any[] = json.result?.runningProcesses || [];
+        for (const proc of processes) {
+          const executable: string = proc.executable || "";
+          if (executable.includes(bundleId) || executable.includes(bundleId.replace(/\./g, "/"))) {
+            const pid = proc.processIdentifier;
+            if (pid != null) { return String(pid); }
           }
         }
       }
@@ -404,15 +553,54 @@ export class IosProvider implements PlatformProvider {
     return undefined;
   }
 
-  public async getPackageInfo(projectRoot: string, scheme: string): Promise<{
+  public async getPackageInfo(projectRoot: string, scheme: string, artifactPath?: string): Promise<{
     packageName: string;
     launchTarget?: string;
   }> {
-    // Get bundle identifier from build settings
-    const xcodeProject = this.findXcodeProject(projectRoot);
-    if (!xcodeProject) {
-      throw new Error(vscode.l10n.t("No Xcode project found"));
+    // Tier 1: Read from built .app bundle's Info.plist (most reliable)
+    if (artifactPath) {
+      const bundleId = await this.readBundleIdFromApp(artifactPath);
+      if (bundleId) {
+        return { packageName: bundleId };
+      }
     }
+
+    // Tier 2: xcodebuild -showBuildSettings (slow but standard)
+    const bundleIdFromSettings = await this.readBundleIdFromBuildSettings(projectRoot, scheme);
+    if (bundleIdFromSettings) {
+      return { packageName: bundleIdFromSettings };
+    }
+
+    // Tier 3: Parse project.pbxproj directly (regex fallback)
+    const bundleIdFromPbxproj = this.readBundleIdFromPbxproj(projectRoot);
+    if (bundleIdFromPbxproj) {
+      return { packageName: bundleIdFromPbxproj };
+    }
+
+    throw new Error(vscode.l10n.t("Could not determine bundle identifier"));
+  }
+
+  private async readBundleIdFromApp(appPath: string): Promise<string | undefined> {
+    const infoPlistPath = path.join(appPath, "Info.plist");
+    if (!fs.existsSync(infoPlistPath)) {
+      return undefined;
+    }
+    try {
+      const output = await this.exec(
+        "/usr/libexec/PlistBuddy",
+        ["-c", "Print :CFBundleIdentifier", infoPlistPath],
+        5000,
+      );
+      const bundleId = output.trim();
+      return bundleId || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async readBundleIdFromBuildSettings(projectRoot: string, scheme: string): Promise<string | undefined> {
+    const xcodeProject = this.findXcodeProject(projectRoot);
+    if (!xcodeProject) { return undefined; }
 
     const config = vscode.workspace.getConfiguration("native-runner");
     const buildConfig = config.get<string>("iosConfiguration", "Debug");
@@ -425,14 +613,45 @@ export class IosProvider implements PlatformProvider {
         "-configuration", buildConfig,
         "-showBuildSettings",
       ];
-      const output = await this.exec("xcodebuild", args, 30000);
-      const match = output.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*(.+)/);
+      const output = await this.exec("xcodebuild", args, 60000);
+      const match = output.match(/^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=\s*(.+)/m);
       if (match) {
-        return { packageName: match[1].trim() };
+        return match[1].trim();
+      }
+    } catch (e) {
+      console.error("readBundleIdFromBuildSettings failed:", e);
+    }
+    return undefined;
+  }
+
+  private readBundleIdFromPbxproj(projectRoot: string): string | undefined {
+    const xcodeProject = this.findXcodeProject(projectRoot);
+    if (!xcodeProject) { return undefined; }
+
+    let pbxprojPath: string;
+    if (xcodeProject.type === "workspace") {
+      const dir = path.dirname(xcodeProject.path);
+      const entries = fs.readdirSync(dir);
+      const proj = entries.find((e) => e.endsWith(".xcodeproj"));
+      if (!proj) { return undefined; }
+      pbxprojPath = path.join(dir, proj, "project.pbxproj");
+    } else {
+      pbxprojPath = path.join(xcodeProject.path, "project.pbxproj");
+    }
+
+    if (!fs.existsSync(pbxprojPath)) { return undefined; }
+
+    try {
+      const content = fs.readFileSync(pbxprojPath, "utf-8");
+      const match = content.match(/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";]+)"?\s*;/);
+      if (match) {
+        const bundleId = match[1].trim();
+        if (!bundleId.includes("$(")) {
+          return bundleId;
+        }
       }
     } catch { /* ignore */ }
-
-    throw new Error(vscode.l10n.t("Could not determine bundle identifier"));
+    return undefined;
   }
 
   // --- Variant (Scheme) Scanning ---
@@ -451,9 +670,57 @@ export class IosProvider implements PlatformProvider {
       const json = JSON.parse(output);
       const key = xcodeProject.type === "workspace" ? "workspace" : "project";
       const schemes: string[] = json[key]?.schemes || [];
-      // Filter out test schemes
-      return schemes.filter((s) => !s.endsWith("Tests") && !s.endsWith("UITests"));
+
+      // Collect pod names from Pods/ directory to exclude framework schemes
+      const podsDir = path.join(projectRoot, "Pods");
+      const podNames = new Set<string>();
+      if (fs.existsSync(podsDir)) {
+        for (const entry of fs.readdirSync(podsDir)) {
+          // Skip special directories
+          if (entry === "Target Support Files" || entry === "Headers"
+            || entry === "Local Podspecs" || entry.startsWith(".")) { continue; }
+          const fullPath = path.join(podsDir, entry);
+          if (fs.statSync(fullPath).isDirectory()) {
+            podNames.add(entry);
+          }
+        }
+      }
+
+      return schemes.filter((s) => {
+        if (s.endsWith("Tests") || s.endsWith("UITests")) { return false; }
+        if (s.startsWith("Pods-")) { return false; }
+        if (podNames.has(s)) { return false; }
+        // Exclude pod-derived schemes like "FirebaseCore-FirebaseCore_Privacy"
+        const baseName = s.split("-")[0];
+        if (baseName !== s && podNames.has(baseName)) { return false; }
+        return true;
+      });
     } catch { return []; }
+  }
+
+  // --- Error Mapping ---
+
+  /** Map known iOS error codes/messages to user-friendly descriptions */
+  private mapIosError(errorText: string): string {
+    const errorMap: Array<{ pattern: RegExp; message: string }> = [
+      { pattern: /0xe8008015/, message: vscode.l10n.t("Provisioning profile not found. Open the project in Xcode and fix signing settings.") },
+      { pattern: /0xe8000067/, message: vscode.l10n.t("Provisioning profile does not match the installed signing identity. Check Xcode signing settings.") },
+      { pattern: /0xe8000022/, message: vscode.l10n.t("App launch failed. The device may need to trust this computer or the provisioning profile.") },
+      { pattern: /0xe80000e2/, message: vscode.l10n.t("Device is locked. Unlock the device and try again.") },
+      { pattern: /device was not.*unlocked/i, message: vscode.l10n.t("Device is locked. Unlock the device and try again.") },
+      { pattern: /lost connection/i, message: vscode.l10n.t("Lost connection to device. Check the USB cable and try again.") },
+      { pattern: /No signing certificate/i, message: vscode.l10n.t("No signing certificate found. Open the project in Xcode and configure code signing.") },
+      { pattern: /Signing requires a development team/i, message: vscode.l10n.t("No development team selected. Set a team in Xcode signing settings.") },
+      { pattern: /No profiles for.*were found/i, message: vscode.l10n.t("No provisioning profiles found. Open Xcode to create or download profiles.") },
+      { pattern: /Developer Mode.*not enabled/i, message: vscode.l10n.t("Developer Mode is not enabled on the device. Enable it in Settings > Privacy & Security.") },
+    ];
+
+    for (const { pattern, message } of errorMap) {
+      if (pattern.test(errorText)) {
+        return message;
+      }
+    }
+    return errorText;
   }
 
   // --- Internal Helpers ---
@@ -477,7 +744,10 @@ export class IosProvider implements PlatformProvider {
   }
 
   private isSimulatorSync(deviceId: string): boolean {
-    return this.simulatorUdids.has(deviceId);
+    if (this.simulatorUdids.has(deviceId)) { return true; }
+    // Simulator UDIDs are UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, 36 chars)
+    // Physical device UDIDs are hex strings (40 chars) or hyphenated (25 chars like 00008140-...)
+    return /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i.test(deviceId);
   }
 
   private exec(command: string, args: string[], timeoutMs = 10000): Promise<string> {

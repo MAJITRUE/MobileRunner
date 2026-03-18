@@ -107,10 +107,12 @@ export class BuildRunner implements vscode.Disposable {
     const variant = this.variantManager.getSelectedVariant();
 
     this.outputChannel.clear();
-    this.outputChannel.show(true);
     this.buildCancelled = false;
     this.isBuildInProgress = true;
     this.updateStatusBar();
+
+    // Auto-show output channel after 30 seconds (long build)
+    const autoShowTimer = setTimeout(() => this.outputChannel.show(true), 30000);
 
     try {
       // Step 1: Build
@@ -127,10 +129,11 @@ export class BuildRunner implements vscode.Disposable {
       this.outputChannel.info(vscode.l10n.t("✓ Installed"));
 
       // Step 3: Launch
-      const pkgInfo = await provider.getPackageInfo(projectRoot, variant);
+      const pkgInfo = await provider.getPackageInfo(projectRoot, variant, artifactPath);
       this.outputChannel.info(vscode.l10n.t("▶ Launching {0}...", pkgInfo.packageName));
       await provider.launchApp(device.id, pkgInfo.packageName, pkgInfo.launchTarget);
       this.outputChannel.info(vscode.l10n.t("✓ Launched"));
+      clearTimeout(autoShowTimer);
 
       // Step 4: Start log in per-device Output Channel
       const logChannelName = device.platform === "ios"
@@ -177,6 +180,7 @@ export class BuildRunner implements vscode.Disposable {
         await this.startDebugSession(device.name, device.platform);
       }
     } catch (error) {
+      clearTimeout(autoShowTimer);
       const msg = error instanceof Error ? error.message : String(error);
       if (msg === "cancelled" || this.buildCancelled) {
         this.buildCancelled = false;
@@ -186,6 +190,7 @@ export class BuildRunner implements vscode.Disposable {
         return;
       }
       this.outputChannel.error(`✗ ${msg}`);
+      this.outputChannel.show(true);
       vscode.window.showErrorMessage(`Native Runner: ${msg}`);
       this.isBuildInProgress = false;
       this.updateStatusBar();

@@ -78,7 +78,7 @@ export interface PlatformProvider {
   findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]): string | undefined;
 
   /** Get package/bundle info from project */
-  getPackageInfo(projectRoot: string, variant: string): Promise<{
+  getPackageInfo(projectRoot: string, variant: string, artifactPath?: string): Promise<{
     packageName: string;
     launchTarget?: string;
   }>;

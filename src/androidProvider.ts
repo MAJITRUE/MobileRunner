@@ -132,7 +132,12 @@ export class AndroidProvider implements PlatformProvider {
   // --- Install / Launch / Stop ---
 
   public async installApp(deviceId: string, apkPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "install", "-r", apkPath], 120000);
+    const output = await this.exec(this.getAdbPath(), ["-s", deviceId, "install", "-r", apkPath], 120000);
+    // adb can exit 0 even on failure — check stdout for "Failure" marker
+    const failureMatch = output.match(/Failure\s*\[([^\]]+)]/);
+    if (failureMatch) {
+      throw new Error(`adb install failed: ${failureMatch[1]}`);
+    }
   }
 
   public async launchApp(
@@ -216,7 +221,7 @@ export class AndroidProvider implements PlatformProvider {
     return undefined;
   }
 
-  public async getPackageInfo(projectRoot: string, _variant: string): Promise<{
+  public async getPackageInfo(projectRoot: string, _variant: string, _artifactPath?: string): Promise<{
     packageName: string;
     launchTarget?: string;
   }> {
