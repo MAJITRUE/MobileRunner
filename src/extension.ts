@@ -1,25 +1,21 @@
 import * as vscode from "vscode";
-import { DeviceProvider } from "./deviceProvider";
+import { AndroidProvider } from "./androidProvider";
 import { DeviceManager } from "./deviceManager";
 import { BuildRunner } from "./buildRunner";
 import { VariantManager } from "./variantManager";
+import { PlatformProvider } from "./types";
 
 let deviceManager: DeviceManager | undefined;
 let buildRunner: BuildRunner | undefined;
 let variantManager: VariantManager | undefined;
 
 // Debug adapter instances, keyed by session name (e.g. "Android: Pixel 7")
-const debugAdapters = new Map<string, AndroidDebugAdapter>();
+const debugAdapters = new Map<string, NativeDebugAdapter>();
 
-export function getDebugAdapter(sessionName?: string): AndroidDebugAdapter | undefined {
-  if (sessionName) {
-    return debugAdapters.get(sessionName);
-  }
-  // Fallback: return the most recently added adapter
-  let last: AndroidDebugAdapter | undefined;
-  for (const adapter of debugAdapters.values()) {
-    last = adapter;
-  }
+export function getDebugAdapter(sessionName?: string): NativeDebugAdapter | undefined {
+  if (sessionName) { return debugAdapters.get(sessionName); }
+  let last: NativeDebugAdapter | undefined;
+  for (const adapter of debugAdapters.values()) { last = adapter; }
   return last;
 }
 
@@ -28,10 +24,28 @@ export function removeDebugAdapter(sessionName: string): void {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  const deviceProvider = new DeviceProvider();
-  deviceManager = new DeviceManager(deviceProvider);
-  variantManager = new VariantManager();
-  buildRunner = new BuildRunner(deviceProvider, deviceManager, variantManager);
+  // Build platform providers list
+  const providers: PlatformProvider[] = [];
+
+  const androidProvider = new AndroidProvider();
+  providers.push(androidProvider);
+
+  // iOS provider — macOS only (loaded dynamically to avoid import errors on other platforms)
+  if (process.platform === "darwin") {
+    try {
+      const { IosProvider } = require("./iosProvider");
+      const iosProvider = new IosProvider();
+      if (iosProvider.isAvailable()) {
+        providers.push(iosProvider);
+      }
+    } catch {
+      // iosProvider not available — skip
+    }
+  }
+
+  deviceManager = new DeviceManager(providers);
+  variantManager = new VariantManager(providers, deviceManager);
+  buildRunner = new BuildRunner(providers, deviceManager, variantManager);
   variantManager.setOutputChannel(buildRunner.outputChannel);
 
   context.subscriptions.push(deviceManager);
@@ -41,137 +55,75 @@ export function activate(context: vscode.ExtensionContext) {
   // Guard: cancel F5 if already running; assign unique ID to bypass confirmOnStart dialog
   context.subscriptions.push(
     vscode.debug.registerDebugConfigurationProvider("native-runner", {
-      resolveDebugConfiguration(
-        _folder,
-        config
-      ): vscode.DebugConfiguration | undefined {
-        // Unique ID per launch — prevents VSCode's "already running" dialog
+      resolveDebugConfiguration(_folder, config): vscode.DebugConfiguration | undefined {
         (config as any).__uniqueId = `session-${Math.random().toString(16).slice(2, 10)}`;
-
-        // Guard: silently cancel if already running or building
-        if (buildRunner?.getIsBuildInProgress()) {
-          return undefined;
-        }
+        if (buildRunner?.getIsBuildInProgress()) { return undefined; }
         const currentDevice = deviceManager?.getCurrentDevice();
-        if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) {
-          return undefined;
-        }
+        if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) { return undefined; }
         return config;
       },
     })
   );
 
-  // Register debug adapter for floating toolbar + debug console
+  // Register debug adapter factory
   context.subscriptions.push(
-    vscode.debug.registerDebugAdapterDescriptorFactory(
-      "native-runner",
-      new AndroidDebugAdapterFactory()
-    )
+    vscode.debug.registerDebugAdapterDescriptorFactory("native-runner", new NativeDebugAdapterFactory())
   );
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.selectDevice", () => {
-      deviceManager?.showDevicePicker();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.run", () => {
-      buildRunner?.installAndRun();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.installAndRun", () => {
-      buildRunner?.installAndRun();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.stop", () => {
-      buildRunner?.stop();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.restart", () => {
-      buildRunner?.restart();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.filterLog", () => {
-      buildRunner?.setLogFilter();
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("native-runner.selectVariant", () => {
-      variantManager?.showVariantPicker();
-    })
+    vscode.commands.registerCommand("native-runner.selectDevice", () => { deviceManager?.showDevicePicker(); }),
+    vscode.commands.registerCommand("native-runner.run", () => { buildRunner?.installAndRun(); }),
+    vscode.commands.registerCommand("native-runner.installAndRun", () => { buildRunner?.installAndRun(); }),
+    vscode.commands.registerCommand("native-runner.stop", () => { buildRunner?.stop(); }),
+    vscode.commands.registerCommand("native-runner.restart", () => { buildRunner?.restart(); }),
+    vscode.commands.registerCommand("native-runner.filterLog", () => { buildRunner?.setLogFilter(); }),
+    vscode.commands.registerCommand("native-runner.selectVariant", () => { variantManager?.showVariantPicker(); }),
   );
 
   // Internal: called from debug adapter launch handler (F5)
-  // Skip if build in progress or selected device already has a session
   context.subscriptions.push(
     vscode.commands.registerCommand("native-runner._launchFromDebug", () => {
-      if (buildRunner?.getIsBuildInProgress()) {
-        return;
-      }
+      if (buildRunner?.getIsBuildInProgress()) { return; }
       const currentDevice = deviceManager?.getCurrentDevice();
-      if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) {
-        return;
-      }
+      if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) { return; }
       buildRunner?.installAndRun(true);
     })
   );
 
-  // Capture debug session when it starts
+  // Debug session lifecycle
   context.subscriptions.push(
     vscode.debug.onDidStartDebugSession((session) => {
-      if (session.type === "native-runner") {
-        buildRunner?.onDebugSessionStarted(session);
-      }
-    })
-  );
-
-  // When debug session ends (floating toolbar stop button pressed)
-  context.subscriptions.push(
+      if (session.type === "native-runner") { buildRunner?.onDebugSessionStarted(session); }
+    }),
     vscode.debug.onDidTerminateDebugSession((session) => {
-      if (session.type === "native-runner") {
-        buildRunner?.onDebugSessionEnded(session);
-      }
-    })
+      if (session.type === "native-runner") { buildRunner?.onDebugSessionEnded(session); }
+    }),
   );
 
-  // Listen for config changes
+  // Config changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("native-runner.sdkPath")) {
-        deviceProvider.refreshSdkPath();
+        androidProvider.refreshSdkPath();
       }
     })
   );
 
-  // Initial device refresh
+  // Initial device refresh + variant scan
   deviceManager.refreshDevices();
-
-  // Scan build variants in background (silent, no notification)
   variantManager.triggerScan(true);
 }
 
-class AndroidDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
-  createDebugAdapterDescriptor(
-    session: vscode.DebugSession
-  ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-    const adapter = new AndroidDebugAdapter(session.name);
+class NativeDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+  createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+    const adapter = new NativeDebugAdapter(session.name);
     debugAdapters.set(session.name, adapter);
     return new vscode.DebugAdapterInlineImplementation(adapter);
   }
 }
 
-export class AndroidDebugAdapter implements vscode.DebugAdapter {
+export class NativeDebugAdapter implements vscode.DebugAdapter {
   private onDidSendMessageEmitter = new vscode.EventEmitter<any>();
   readonly onDidSendMessage = this.onDidSendMessageEmitter.event;
   private seq = 1;
@@ -182,19 +134,11 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
     if (message.type === "request") {
       switch (message.command) {
         case "initialize":
-          this.sendResponse(message, {
-            supportsTerminateRequest: true,
-            supportsRestartRequest: true,
-          });
-          this.onDidSendMessageEmitter.fire({
-            type: "event",
-            event: "initialized",
-            seq: this.seq++,
-          });
+          this.sendResponse(message, { supportsTerminateRequest: true, supportsRestartRequest: true });
+          this.onDidSendMessageEmitter.fire({ type: "event", event: "initialized", seq: this.seq++ });
           break;
         case "launch":
           this.sendResponse(message, {});
-          // Trigger build (skipDebugSession=true since session already exists)
           vscode.commands.executeCommand("native-runner._launchFromDebug");
           break;
         case "restart":
@@ -203,7 +147,6 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
           break;
         case "terminate":
           this.sendResponse(message, {});
-          // Signal VSCode that we're done
           this.sendTerminated();
           break;
         case "disconnect":
@@ -219,41 +162,22 @@ export class AndroidDebugAdapter implements vscode.DebugAdapter {
     }
   }
 
-  /**
-   * Write a line to the Debug Console via DAP output event
-   */
   public writeToConsole(text: string, category: "console" | "stdout" | "stderr" = "stdout"): void {
     this.onDidSendMessageEmitter.fire({
-      type: "event",
-      event: "output",
-      seq: this.seq++,
-      body: {
-        category,
-        output: text + "\n",
-      },
+      type: "event", event: "output", seq: this.seq++,
+      body: { category, output: text + "\n" },
     });
   }
 
   private sendResponse(request: any, body: any): void {
     this.onDidSendMessageEmitter.fire({
-      type: "response",
-      request_seq: request.seq,
-      success: true,
-      command: request.command,
-      body,
-      seq: this.seq++,
+      type: "response", request_seq: request.seq, success: true,
+      command: request.command, body, seq: this.seq++,
     });
   }
 
-  /**
-   * Send DAP terminated event to end the debug session
-   */
   public sendTerminated(): void {
-    this.onDidSendMessageEmitter.fire({
-      type: "event",
-      event: "terminated",
-      seq: this.seq++,
-    });
+    this.onDidSendMessageEmitter.fire({ type: "event", event: "terminated", seq: this.seq++ });
   }
 
   dispose(): void {

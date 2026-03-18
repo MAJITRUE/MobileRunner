@@ -2,7 +2,7 @@
   "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,10 @@
   ],
   "keywords": [
     "android",
+    "ios",
+    "xcode",
     "emulator",
+    "simulator",
     "adb",
     "gradle",
     "device"
@@ -27,7 +30,9 @@
   "activationEvents": [
     "workspaceContains:**/build.gradle",
     "workspaceContains:**/build.gradle.kts",
-    "workspaceContains:**/AndroidManifest.xml"
+    "workspaceContains:**/AndroidManifest.xml",
+    "workspaceContains:**/*.xcodeproj",
+    "workspaceContains:**/*.xcworkspace"
   ],
   "l10n": "./l10n",
   "main": "./out/extension.js",
@@ -61,7 +66,7 @@
     "debuggers": [
       {
         "type": "native-runner",
-        "label": "Android Build & Run",
+        "label": "Native Build & Run",
         "configurationAttributes": {
           "launch": {
             "properties": {}
@@ -70,7 +75,7 @@
       }
     ],
     "configuration": {
-      "title": "Android Runner",
+      "title": "Native Runner",
       "properties": {
         "native-runner.sdkPath": {
           "type": "string",
@@ -96,6 +101,16 @@
           "type": "boolean",
           "default": true,
           "description": "%config.autoSelectDevice.description%"
+        },
+        "native-runner.iosScheme": {
+          "type": "string",
+          "default": "",
+          "description": "%config.iosScheme.description%"
+        },
+        "native-runner.iosConfiguration": {
+          "type": "string",
+          "default": "Debug",
+          "description": "%config.iosConfiguration.description%"
         }
       }
     }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 (2026-03-18)
+
+- **iOS support** (macOS only) — Build, install, and run Xcode projects on iOS simulators and physical devices
+- iOS simulator detection via `xcrun simctl`, physical device detection via `xcrun devicectl`
+- Xcode scheme scanning and selection (variant picker adapts to selected platform)
+- Console log streaming from iOS simulators and devices
+- Unified device picker — Android and iOS devices shown together with platform labels
+- Common `PlatformProvider` interface — architecture refactored for multi-platform extensibility
+- New settings: `native-runner.iosScheme`, `native-runner.iosConfiguration`
+- Activation on `.xcodeproj` / `.xcworkspace` presence
+
 ## 0.3.3 (2026-03-18)
 
 - Device picker UI improvements — Flutter-style layout with Current Device / Available Devices / Offline Emulators sections

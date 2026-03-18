@@ -1,56 +1,58 @@
 import * as vscode from "vscode";
-import { AndroidDevice, AvdEmulator, DeviceProvider } from "./deviceProvider";
+import { Device, Emulator, PlatformProvider } from "./types";
 
 interface DevicePickItem extends vscode.QuickPickItem {
-  device?: AndroidDevice;
-  emulator?: AvdEmulator;
+  device?: Device;
+  emulator?: Emulator;
   coldBoot?: boolean;
   action?: "refresh";
 }
 
 export class DeviceManager implements vscode.Disposable {
   private statusBarItem: vscode.StatusBarItem;
-  private currentDevice: AndroidDevice | undefined;
-  private devices: AndroidDevice[] = [];
+  private currentDevice: Device | undefined;
+  private devices: Device[] = [];
   private pollTimer: NodeJS.Timeout | undefined;
   private disposables: vscode.Disposable[] = [];
 
-  private readonly onDeviceChangedEmitter = new vscode.EventEmitter<AndroidDevice | undefined>();
+  private readonly onDeviceChangedEmitter = new vscode.EventEmitter<Device | undefined>();
   public readonly onDeviceChanged = this.onDeviceChangedEmitter.event;
 
-  constructor(private deviceProvider: DeviceProvider) {
-    // Create status bar item (right side, like Flutter)
+  constructor(private providers: PlatformProvider[]) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       "androidRunnerDevice",
       vscode.StatusBarAlignment.Right,
       100
     );
-    this.statusBarItem.name = "Android Device";
+    this.statusBarItem.name = "Device";
     this.statusBarItem.command = "native-runner.selectDevice";
-    this.statusBarItem.tooltip = vscode.l10n.t("Select Android Device");
+    this.statusBarItem.tooltip = vscode.l10n.t("Select Device");
     this.disposables.push(this.statusBarItem);
 
     this.updateStatusBar();
     this.statusBarItem.show();
 
-    // Start polling for device changes
     this.startPolling();
   }
 
-  public getCurrentDevice(): AndroidDevice | undefined {
+  public getCurrentDevice(): Device | undefined {
     return this.currentDevice;
   }
 
-  public getDevices(): AndroidDevice[] {
+  public getDevices(): Device[] {
     return this.devices;
+  }
+
+  public getProviderForDevice(device: Device): PlatformProvider | undefined {
+    return this.providers.find((p) => p.platform === device.platform);
   }
 
   /**
    * Show the device picker QuickPick UI
    */
-  public async showDevicePicker(): Promise<AndroidDevice | undefined> {
+  public async showDevicePicker(): Promise<Device | undefined> {
     const quickPick = vscode.window.createQuickPick<DevicePickItem>();
-    quickPick.placeholder = vscode.l10n.t("Select an Android device or emulator");
+    quickPick.placeholder = vscode.l10n.t("Select a device to use");
     quickPick.busy = true;
     quickPick.ignoreFocusOut = true;
     quickPick.show();
@@ -62,8 +64,7 @@ export class DeviceManager implements vscode.Disposable {
 
     const selection = await new Promise<DevicePickItem | undefined>((resolve) => {
       quickPick.onDidAccept(() => {
-        const selected = quickPick.selectedItems[0];
-        resolve(selected);
+        resolve(quickPick.selectedItems[0]);
         quickPick.hide();
       });
       quickPick.onDidHide(() => resolve(undefined));
@@ -71,16 +72,12 @@ export class DeviceManager implements vscode.Disposable {
 
     quickPick.dispose();
 
-    if (!selection) {
-      return undefined;
-    }
+    if (!selection) { return undefined; }
 
-    // Handle emulator launch
     if (selection.emulator) {
       return this.launchAndWaitForEmulator(selection.emulator, selection.coldBoot);
     }
 
-    // Handle device selection
     if (selection.device) {
       this.selectDevice(selection.device);
       return selection.device;
@@ -91,7 +88,13 @@ export class DeviceManager implements vscode.Disposable {
 
   private async buildPickerItems(): Promise<DevicePickItem[]> {
     const items: DevicePickItem[] = [];
-    const emulators = await this.deviceProvider.getAvailableEmulators();
+
+    // Collect emulators from all providers
+    const allEmulators: Emulator[] = [];
+    for (const provider of this.providers) {
+      const emus = await provider.getAvailableEmulators();
+      allEmulators.push(...emus);
+    }
 
     // Connected devices — split into Current Device + Available Devices
     const onlineDevices = this.devices.filter((d) => d.isOnline);
@@ -101,7 +104,7 @@ export class DeviceManager implements vscode.Disposable {
       const currentOnline = onlineDevices.find((d) => d.id === currentId);
       const otherOnline = onlineDevices.filter((d) => d.id !== currentId);
 
-      // "Available Devices" separator (shown at right edge, like Flutter)
+      // "Available Devices" separator
       items.push({
         label: vscode.l10n.t("Available Devices"),
         kind: vscode.QuickPickItemKind.Separator,
@@ -109,11 +112,10 @@ export class DeviceManager implements vscode.Disposable {
 
       // Current Device first
       if (currentOnline) {
-        const icon = currentOnline.type === "emulator" ? "$(device-mobile)" : "$(plug)";
-        const typeLabel = currentOnline.type === "emulator" ? "mobile" : "physical";
+        const icon = this.deviceIcon(currentOnline);
         items.push({
           label: `${icon} ${currentOnline.name}`,
-          description: `${currentOnline.id} — ${typeLabel}`,
+          description: `${currentOnline.id} — ${this.deviceTypeLabel(currentOnline)}`,
           detail: vscode.l10n.t("Current Device"),
           device: currentOnline,
         });
@@ -121,25 +123,22 @@ export class DeviceManager implements vscode.Disposable {
 
       // Other online devices
       for (const device of otherOnline) {
-        const icon = device.type === "emulator" ? "$(device-mobile)" : "$(plug)";
-        const typeLabel = device.type === "emulator" ? "mobile" : "physical";
+        const icon = this.deviceIcon(device);
         items.push({
           label: `${icon} ${device.name}`,
-          description: `${device.id} — ${typeLabel}`,
+          description: `${device.id} — ${this.deviceTypeLabel(device)}`,
           device,
         });
       }
     }
 
-    // Offline emulators (not currently running)
+    // Offline emulators/simulators (not currently running)
     const runningEmulatorNames = new Set(
       onlineDevices
         .filter((d) => d.type === "emulator")
-        .map((d) => d.name.replace(/ /g, "_"))
+        .map((d) => d.platform === "ios" ? d.id : d.name.replace(/ /g, "_"))
     );
-    const offlineEmulators = emulators.filter(
-      (e) => !runningEmulatorNames.has(e.id)
-    );
+    const offlineEmulators = allEmulators.filter((e) => !runningEmulatorNames.has(e.id));
 
     if (offlineEmulators.length > 0) {
       items.push({
@@ -147,8 +146,10 @@ export class DeviceManager implements vscode.Disposable {
         kind: vscode.QuickPickItemKind.Separator,
       });
       for (const emu of offlineEmulators) {
+        const platformLabel = emu.runtime ? ` (${emu.runtime})` : "";
         items.push({
-          label: `$(play) ${vscode.l10n.t("Start {0}", emu.name)}`,
+          label: `$(play) ${vscode.l10n.t("Start {0}", emu.name)}${platformLabel}`,
+          description: emu.platform,
           emulator: emu,
         });
       }
@@ -174,21 +175,18 @@ export class DeviceManager implements vscode.Disposable {
     if (items.length === 0) {
       items.push({
         label: vscode.l10n.t("$(info) No devices found"),
-        description: vscode.l10n.t("Connect a device or create an AVD in Android Studio"),
+        description: vscode.l10n.t("Connect a device or start an emulator/simulator"),
       });
     }
 
-    // Cold boot section (at the bottom, separated)
-    const coldBootTargets: { name: string; emulator: AvdEmulator }[] = [];
-    // Running emulators
-    for (const device of onlineDevices.filter((d) => d.type === "emulator")) {
-      const avd = emulators.find((e) => e.name === device.name.replace(/ /g, "_"));
-      if (avd) {
-        coldBootTargets.push({ name: device.name, emulator: avd });
-      }
+    // Cold boot section (Android emulators only)
+    const androidEmulators = allEmulators.filter((e) => e.platform === "android");
+    const coldBootTargets: { name: string; emulator: Emulator }[] = [];
+    for (const device of onlineDevices.filter((d) => d.type === "emulator" && d.platform === "android")) {
+      const avd = androidEmulators.find((e) => e.name === device.name.replace(/ /g, "_"));
+      if (avd) { coldBootTargets.push({ name: device.name, emulator: avd }); }
     }
-    // Offline emulators
-    for (const emu of offlineEmulators) {
+    for (const emu of offlineEmulators.filter((e) => e.platform === "android")) {
       coldBootTargets.push({ name: emu.name, emulator: emu });
     }
     if (coldBootTargets.length > 0) {
@@ -208,7 +206,24 @@ export class DeviceManager implements vscode.Disposable {
     return items;
   }
 
-  private async launchAndWaitForEmulator(emulator: AvdEmulator, coldBoot = false): Promise<AndroidDevice | undefined> {
+  private deviceIcon(device: Device): string {
+    if (device.platform === "ios") {
+      return device.type === "emulator" ? "$(device-mobile)" : "$(plug)";
+    }
+    return device.type === "emulator" ? "$(device-mobile)" : "$(plug)";
+  }
+
+  private deviceTypeLabel(device: Device): string {
+    if (device.platform === "ios") {
+      return device.type === "emulator" ? "ios simulator" : "ios device";
+    }
+    return device.type === "emulator" ? "android" : "android device";
+  }
+
+  private async launchAndWaitForEmulator(emulator: Emulator, coldBoot = false): Promise<Device | undefined> {
+    const provider = this.providers.find((p) => p.platform === emulator.platform);
+    if (!provider) { return undefined; }
+
     const maxWaitSeconds = 120;
     let cancelled = false;
 
@@ -226,39 +241,36 @@ export class DeviceManager implements vscode.Disposable {
         // If cold booting a running emulator, kill it first
         if (coldBoot) {
           const runningDevice = this.devices.find(
-            (d) => d.type === "emulator" && d.isOnline && d.name.replace(/ /g, "_") === emulator.id
+            (d) => d.type === "emulator" && d.isOnline && d.platform === emulator.platform &&
+              (d.platform === "ios" ? d.id === emulator.id : d.name.replace(/ /g, "_") === emulator.id)
           );
           if (runningDevice) {
-            await this.deviceProvider.killEmulator(runningDevice.id);
-            // Wait for emulator to fully shut down
+            await provider.killEmulator(runningDevice.id);
             for (let i = 0; i < 15; i++) {
               if (cancelled) { return; }
               await this.sleep(1000);
-              const devices = await this.deviceProvider.getConnectedDevices();
-              const stillRunning = devices.find((d) => d.id === runningDevice.id && d.isOnline);
+              await this.refreshDevices();
+              const stillRunning = this.devices.find((d) => d.id === runningDevice.id && d.isOnline);
               if (!stillRunning) { break; }
             }
           }
         }
 
-        await this.deviceProvider.launchEmulator(emulator.id, coldBoot);
+        await provider.launchEmulator(emulator.id, coldBoot);
 
-        // Wait for the emulator to appear in adb devices
         for (let i = 0; i < maxWaitSeconds; i++) {
           if (cancelled) { return; }
           await this.sleep(2000);
-          const devices = await this.deviceProvider.getConnectedDevices();
-          this.devices = devices;
-          this.updateStatusBar();
-          const newDevice = devices.find(
-            (d) => d.type === "emulator" && d.isOnline
+          await this.refreshDevices();
+          const newDevice = this.devices.find(
+            (d) => d.type === "emulator" && d.isOnline && d.platform === emulator.platform
           );
           if (newDevice) {
             this.selectDevice(newDevice);
             return;
           }
           progress.report({
-            message: vscode.l10n.t("{0}s — {1} device(s) found", (i + 1) * 2, devices.length),
+            message: vscode.l10n.t("{0}s — {1} device(s) found", (i + 1) * 2, this.devices.length),
           });
         }
 
@@ -271,23 +283,24 @@ export class DeviceManager implements vscode.Disposable {
     return this.currentDevice;
   }
 
-  public selectDevice(device: AndroidDevice): void {
+  public selectDevice(device: Device): void {
     this.currentDevice = device;
     this.updateStatusBar();
     this.onDeviceChangedEmitter.fire(device);
   }
 
   public async refreshDevices(): Promise<void> {
-    this.devices = await this.deviceProvider.getConnectedDevices();
+    const allDevices: Device[] = [];
+    for (const provider of this.providers) {
+      const devices = await provider.getConnectedDevices();
+      allDevices.push(...devices);
+    }
+    this.devices = allDevices;
 
-    // Auto-select if current device is gone
+    // Auto-deselect if current device is gone
     if (this.currentDevice) {
-      const stillExists = this.devices.find(
-        (d) => d.id === this.currentDevice!.id && d.isOnline
-      );
-      if (!stillExists) {
-        this.currentDevice = undefined;
-      }
+      const stillExists = this.devices.find((d) => d.id === this.currentDevice!.id && d.isOnline);
+      if (!stillExists) { this.currentDevice = undefined; }
     }
 
     // Auto-select first online device if none selected
@@ -305,25 +318,20 @@ export class DeviceManager implements vscode.Disposable {
 
   private updateStatusBar(): void {
     if (this.currentDevice) {
-      const icon = this.currentDevice.type === "emulator" ? "$(device-mobile)" : "$(plug)";
+      const icon = this.deviceIcon(this.currentDevice);
       this.statusBarItem.text = `${icon} ${this.currentDevice.name}`;
       this.statusBarItem.backgroundColor = undefined;
     } else {
       this.statusBarItem.text = `$(device-mobile) ${vscode.l10n.t("No Device")}`;
-      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
-        "statusBarItem.warningBackground"
-      );
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
     }
   }
 
   private startPolling(): void {
-    // Poll every 3 seconds for device changes
     this.pollTimer = setInterval(async () => {
       const oldDeviceCount = this.devices.length;
       const oldDeviceId = this.currentDevice?.id;
       await this.refreshDevices();
-
-      // Notify if device list changed
       if (this.devices.length !== oldDeviceCount || this.currentDevice?.id !== oldDeviceId) {
         this.updateStatusBar();
       }
@@ -335,12 +343,8 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-    }
+    if (this.pollTimer) { clearInterval(this.pollTimer); }
     this.onDeviceChangedEmitter.dispose();
-    for (const d of this.disposables) {
-      d.dispose();
-    }
+    for (const d of this.disposables) { d.dispose(); }
   }
 }
