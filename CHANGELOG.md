@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 (2026-03-18)
+
+- Auto-fix gradlew permissions (`chmod +x`) before Gradle builds
+- Auto-write `sdk.dir` to `local.properties` when Android SDK is detected
+- Pass `ANDROID_SDK_ROOT` environment variable to Gradle processes
+
 ## 0.4.0 (2026-03-18)
 
 - **iOS support** (macOS only) — Build, install, and run Xcode projects on iOS simulators and physical devices

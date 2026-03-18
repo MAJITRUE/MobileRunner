@@ -279,6 +279,22 @@ export class AndroidProvider implements PlatformProvider {
     return vscode.workspace.getConfiguration("native-runner").get<string>("appModule", "app");
   }
 
+  /** Write sdk.dir to local.properties if not already present */
+  private ensureLocalProperties(projectRoot: string): void {
+    if (!this.sdkPath) { return; }
+    const localPropsPath = path.join(projectRoot, "local.properties");
+    const escapedSdkPath = this.sdkPath.replace(/\\/g, "\\\\");
+    try {
+      if (fs.existsSync(localPropsPath)) {
+        const content = fs.readFileSync(localPropsPath, "utf-8");
+        if (/^sdk\.dir\s*=/m.test(content)) { return; }
+        fs.appendFileSync(localPropsPath, `\nsdk.dir=${escapedSdkPath}\n`);
+      } else {
+        fs.writeFileSync(localPropsPath, `sdk.dir=${escapedSdkPath}\n`);
+      }
+    } catch { /* ignore — read-only filesystem etc. */ }
+  }
+
   private resolveSdkPath(): string | undefined {
     const config = vscode.workspace.getConfiguration("native-runner");
     const configPath = config.get<string>("sdkPath");
@@ -356,7 +372,16 @@ export class AndroidProvider implements PlatformProvider {
       const gradlewPath = path.join(projectRoot, isWindows ? "gradlew.bat" : "gradlew");
       const executable = fs.existsSync(gradlewPath) ? gradlewPath : isWindows ? "gradlew.bat" : "./gradlew";
 
+      // Ensure gradlew is executable (like Flutter does)
+      if (!isWindows && fs.existsSync(gradlewPath)) {
+        try { fs.chmodSync(gradlewPath, 0o755); } catch { /* ignore */ }
+      }
+
+      // Write sdk.dir to local.properties if needed
+      this.ensureLocalProperties(projectRoot);
+
       const env = { ...process.env };
+      if (this.sdkPath) { env.ANDROID_SDK_ROOT = this.sdkPath; }
       const javaHome = this.detectJavaHome();
       if (javaHome) {
         env.JAVA_HOME = javaHome;
@@ -413,9 +438,16 @@ export class AndroidProvider implements PlatformProvider {
       const isWindows = process.platform === "win32";
       const gradlewPath = path.join(projectRoot, isWindows ? "gradlew.bat" : "gradlew");
       const executable = fs.existsSync(gradlewPath) ? gradlewPath : isWindows ? "gradlew.bat" : "./gradlew";
+
+      if (!isWindows && fs.existsSync(gradlewPath)) {
+        try { fs.chmodSync(gradlewPath, 0o755); } catch { /* ignore */ }
+      }
+      this.ensureLocalProperties(projectRoot);
+
       const appModule = this.getAppModule();
       const args = [`${appModule}:tasks`, "--all", "--console=plain"];
       const env = { ...process.env };
+      if (this.sdkPath) { env.ANDROID_SDK_ROOT = this.sdkPath; }
       const javaHome = this.detectJavaHome();
       if (javaHome) { env.JAVA_HOME = javaHome; }
 
