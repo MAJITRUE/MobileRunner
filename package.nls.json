@@ -1,6 +1,6 @@
 {
   "displayName": "Android / iOS Build & Run",
-  "description": "Build, install, and run Android & iOS apps directly from VSCode — no Android Studio or Xcode required",
+  "description": "Build, install, and run Android & iOS apps directly from VSCode",
   "command.selectDevice": "Native Runner: Select Device",
   "command.run": "Native Runner: Run App",
   "command.stop": "Native Runner: Stop App",

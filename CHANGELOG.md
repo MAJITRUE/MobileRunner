@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (2026-03-18)
+
+- Fix misleading description that implied Xcode/Android Studio are not required
+
 ## 0.4.1 (2026-03-18)
 
 - Auto-fix gradlew permissions (`chmod +x`) before Gradle builds

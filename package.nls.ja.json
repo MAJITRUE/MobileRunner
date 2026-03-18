@@ -1,6 +1,6 @@
 {
   "displayName": "Android / iOS Build & Run",
-  "description": "Android Studio / Xcode 不要 — VSCode から Android / iOS アプリをビルド・インストール・実行",
+  "description": "VSCode から Android / iOS アプリをビルド・インストール・実行",
   "command.selectDevice": "Native Runner: デバイスを選択",
   "command.run": "Native Runner: アプリを実行",
   "command.stop": "Native Runner: アプリを停止",
