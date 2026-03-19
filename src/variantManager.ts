@@ -121,7 +121,8 @@ export class VariantManager implements vscode.Disposable {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) { return []; }
 
-    const projectRoot = provider.findProjectRoot(workspaceFolders);
+    const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const projectRoot = provider.findProjectRoot(workspaceFolders, activeFilePath);
     if (!projectRoot) { return []; }
 
     this.scanning = true;

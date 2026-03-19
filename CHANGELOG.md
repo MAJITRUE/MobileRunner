@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3 (2026-03-19)
+
+- Project root detection: walk up from active file (Dart-Code style) for reliable detection in nested projects
+- iOS simctl data caching (2s TTL) — device picker opens faster, reduced duplicate commands
+- devicectl timeout reduced from 15s to 5s
+- Device polling interval 3s → 4s (matches Dart-Code)
+
 ## 0.4.2 (2026-03-18)
 
 - Fix misleading description that implied Xcode/Android Studio are not required

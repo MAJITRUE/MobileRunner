@@ -74,8 +74,10 @@ export interface PlatformProvider {
   /** Get PID of running app */
   getAppPid(deviceId: string, packageName: string): Promise<string | undefined>;
 
-  /** Find project root for this platform in workspace folders */
-  findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]): string | undefined;
+  /** Find project root for this platform.
+   *  Strategy: if activeFilePath is provided, walk up from there looking for project markers.
+   *  Otherwise scan workspace folders and their immediate subdirectories. */
+  findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined;
 
   /** Get package/bundle info from project */
   getPackageInfo(projectRoot: string, variant: string, artifactPath?: string): Promise<{

@@ -207,16 +207,34 @@ export class AndroidProvider implements PlatformProvider {
 
   // --- Project Detection ---
 
-  public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]): string | undefined {
+  private hasGradleProject(dir: string): boolean {
+    return fs.existsSync(path.join(dir, "build.gradle")) || fs.existsSync(path.join(dir, "build.gradle.kts"));
+  }
+
+  public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
+    // Strategy 1: Walk up from active file
+    if (activeFilePath) {
+      let dir = path.dirname(activeFilePath);
+      while (dir !== path.dirname(dir)) {
+        if (this.hasGradleProject(dir)) { return dir; }
+        dir = path.dirname(dir);
+      }
+    }
+
+    // Strategy 2: Scan workspace folders and one level of subdirectories
     for (const folder of workspaceFolders) {
       const root = folder.uri.fsPath;
-      if (fs.existsSync(path.join(root, "build.gradle")) || fs.existsSync(path.join(root, "build.gradle.kts"))) {
-        return root;
-      }
-      const androidDir = path.join(root, "android");
-      if (fs.existsSync(path.join(androidDir, "build.gradle")) || fs.existsSync(path.join(androidDir, "build.gradle.kts"))) {
-        return androidDir;
-      }
+      if (this.hasGradleProject(root)) { return root; }
+
+      try {
+        const entries = fs.readdirSync(root, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
+            const subDir = path.join(root, entry.name);
+            if (this.hasGradleProject(subDir)) { return subDir; }
+          }
+        }
+      } catch { /* ignore */ }
     }
     return undefined;
   }

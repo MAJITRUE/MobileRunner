@@ -340,7 +340,7 @@ export class DeviceManager implements vscode.Disposable {
       if (this.devices.length !== oldDeviceCount || this.currentDevice?.id !== oldDeviceId) {
         this.updateStatusBar();
       }
-    }, 3000);
+    }, 4000);
   }
 
   private sleep(ms: number): Promise<void> {

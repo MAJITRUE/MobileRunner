@@ -13,6 +13,10 @@ export class IosProvider implements PlatformProvider {
   /** Cached Xcode major version (e.g. 15, 16, 26) */
   private xcodeVersion: number | undefined;
 
+  /** Cached simctl data — shared between getConnectedDevices and getAvailableEmulators */
+  private simctlCache: { json: any; runtimes: Map<string, string>; timestamp: number } | undefined;
+  private static readonly SIMCTL_CACHE_TTL = 2000; // 2 seconds
+
   public isAvailable(): boolean {
     // Check if xcrun (Xcode command line tools) is available
     try {
@@ -41,6 +45,22 @@ export class IosProvider implements PlatformProvider {
     return this.getXcodeVersion() >= 15;
   }
 
+  /** Get cached simctl data (shared between getConnectedDevices and getAvailableEmulators) */
+  private async getSimctlData(): Promise<{ json: any; runtimes: Map<string, string> }> {
+    const now = Date.now();
+    if (this.simctlCache && (now - this.simctlCache.timestamp) < IosProvider.SIMCTL_CACHE_TTL) {
+      return this.simctlCache;
+    }
+
+    const [devicesOutput, runtimes] = await Promise.all([
+      this.exec("xcrun", ["simctl", "list", "devices", "--json"]),
+      this.getRuntimeNames(),
+    ]);
+    const json = JSON.parse(devicesOutput);
+    this.simctlCache = { json, runtimes, timestamp: now };
+    return this.simctlCache;
+  }
+
   // --- Device Detection ---
 
   public async getConnectedDevices(): Promise<Device[]> {
@@ -62,15 +82,12 @@ export class IosProvider implements PlatformProvider {
   }
 
   private async getSimulatorDevices(): Promise<Device[]> {
-    const output = await this.exec("xcrun", ["simctl", "list", "devices", "--json"]);
-    const json = JSON.parse(output);
+    const { json } = await this.getSimctlData();
     const devices: Device[] = [];
 
-    // Update simulator UDID cache for isSimulatorSync()
     this.simulatorUdids.clear();
 
     for (const [runtimeId, runtimeDevices] of Object.entries(json.devices || {})) {
-      // Only include iOS runtimes (skip watchOS, tvOS, visionOS)
       if (!runtimeId.includes("iOS") && !runtimeId.includes("iphone")) { continue; }
 
       for (const sim of runtimeDevices as any[]) {
@@ -88,7 +105,6 @@ export class IosProvider implements PlatformProvider {
       }
     }
 
-    // Only return booted simulators as "connected"
     return devices.filter((d) => d.isOnline);
   }
 
@@ -100,7 +116,7 @@ export class IosProvider implements PlatformProvider {
       const output = await this.exec("xcrun", [
         "devicectl", "list", "devices",
         "--json-output", "/dev/stdout",
-      ], 15000);
+      ], 5000);
       const json = JSON.parse(output);
       const devices: Device[] = [];
 
@@ -150,20 +166,16 @@ export class IosProvider implements PlatformProvider {
 
   public async getAvailableEmulators(): Promise<Emulator[]> {
     try {
-      const output = await this.exec("xcrun", ["simctl", "list", "devices", "--json"]);
-      const json = JSON.parse(output);
+      const { json, runtimes } = await this.getSimctlData();
       const emulators: Emulator[] = [];
-
-      // Also get runtimes for display
-      const runtimeNames = await this.getRuntimeNames();
 
       for (const [runtimeId, runtimeDevices] of Object.entries(json.devices || {})) {
         if (!runtimeId.includes("iOS") && !runtimeId.includes("iphone")) { continue; }
-        const runtimeName = runtimeNames.get(runtimeId) || this.parseRuntimeName(runtimeId);
+        const runtimeName = runtimes.get(runtimeId) || this.parseRuntimeName(runtimeId);
 
         for (const sim of runtimeDevices as any[]) {
           if (sim.isAvailable === false) { continue; }
-          if (sim.state === "Booted") { continue; } // Skip already running
+          if (sim.state === "Booted") { continue; }
 
           emulators.push({
             id: sim.udid,
@@ -518,18 +530,30 @@ export class IosProvider implements PlatformProvider {
 
   // --- Project Detection ---
 
-  public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]): string | undefined {
+  public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
+    // Strategy 1: Walk up from active file (like Dart-Code's locateBestProjectRoot)
+    if (activeFilePath) {
+      let dir = path.dirname(activeFilePath);
+      while (dir !== path.dirname(dir)) {
+        if (this.findXcodeProject(dir)) { return dir; }
+        dir = path.dirname(dir);
+      }
+    }
+
+    // Strategy 2: Scan workspace folders and one level of subdirectories
     for (const folder of workspaceFolders) {
       const root = folder.uri.fsPath;
-      const xcodeProject = this.findXcodeProject(root);
-      if (xcodeProject) { return root; }
+      if (this.findXcodeProject(root)) { return root; }
 
-      // Check ios/ subdirectory (Flutter/React Native convention)
-      const iosDir = path.join(root, "ios");
-      if (fs.existsSync(iosDir)) {
-        const iosProject = this.findXcodeProject(iosDir);
-        if (iosProject) { return iosDir; }
-      }
+      try {
+        const entries = fs.readdirSync(root, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
+            const subDir = path.join(root, entry.name);
+            if (this.findXcodeProject(subDir)) { return subDir; }
+          }
+        }
+      } catch { /* ignore */ }
     }
     return undefined;
   }

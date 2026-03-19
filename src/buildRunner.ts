@@ -93,7 +93,8 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
-    const projectRoot = provider.findProjectRoot(workspaceFolders);
+    const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const projectRoot = provider.findProjectRoot(workspaceFolders, activeFilePath);
     if (!projectRoot) {
       vscode.window.showErrorMessage(
         vscode.l10n.t("No {0} project found in workspace.", device.platform === "ios" ? "Xcode" : "Android")
