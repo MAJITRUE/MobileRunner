@@ -4,6 +4,8 @@ import { DeviceManager } from "./deviceManager";
 import { BuildRunner } from "./buildRunner";
 import { VariantManager } from "./variantManager";
 import { PlatformProvider } from "./types";
+import { FileExplorerService } from "./fileExplorerService";
+import { DeviceFileExplorer } from "./fileExplorer";
 
 let deviceManager: DeviceManager | undefined;
 let buildRunner: BuildRunner | undefined;
@@ -48,9 +50,14 @@ export function activate(context: vscode.ExtensionContext) {
   buildRunner = new BuildRunner(providers, deviceManager, variantManager);
   variantManager.setOutputChannel(buildRunner.outputChannel);
 
+  // File Explorer
+  const fileExplorerService = new FileExplorerService(androidProvider);
+  const fileExplorer = new DeviceFileExplorer(fileExplorerService, deviceManager);
+
   context.subscriptions.push(deviceManager);
   context.subscriptions.push(variantManager);
   context.subscriptions.push(buildRunner);
+  context.subscriptions.push(fileExplorer);
 
   // Guard: cancel F5 if already running; assign unique ID to bypass confirmOnStart dialog
   context.subscriptions.push(
@@ -79,6 +86,17 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("native-runner.restart", () => { buildRunner?.restart(); }),
     vscode.commands.registerCommand("native-runner.filterLog", () => { buildRunner?.setLogFilter(); }),
     vscode.commands.registerCommand("native-runner.selectVariant", () => { variantManager?.showVariantPicker(); }),
+    // File Explorer commands
+    vscode.commands.registerCommand("native-runner.fileExplorer.selectDevice", () => { fileExplorer.selectExplorerDevice(); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.refresh", () => { fileExplorer.refresh(); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.download", (item) => { fileExplorer.downloadFile(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.upload", (item) => { fileExplorer.uploadFile(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.delete", (item) => { fileExplorer.deleteItem(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.copyPath", (item) => { fileExplorer.copyPath(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.openInEditor", (item) => { fileExplorer.openInEditor(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.newFolder", (item) => { fileExplorer.newFolder(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.newFile", (item) => { fileExplorer.newFile(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.rename", (item) => { fileExplorer.renameItem(item); }),
   );
 
   // Internal: called from debug adapter launch handler (F5)

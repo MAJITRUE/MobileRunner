@@ -1,6 +1,6 @@
-# Android Build & Run
+# Android / iOS Build & Run
 
-Build, install, and run Android native projects directly from VSCode — no Android Studio required.
+Build, install, and run Android & iOS apps directly from VSCode.
 
 ![Status Bar](images/statusbar.png)
 
@@ -18,6 +18,17 @@ Build, install, and run Android native projects directly from VSCode — no Andr
 - **Floating Toolbar** — Stop and restart your app from the debug toolbar, just like Flutter.
 - **F5 Support** — Press F5 to build & run via `launch.json`.
 - **Auto-detect SDK & JDK** — Finds Android SDK and JDK from environment variables, Android Studio, or common install paths.
+- **Device File Explorer** — Browse, download, upload, and delete files on connected devices. Supports app-private data via `run-as`.
+
+  ![Device Explorer](images/device-explorer.png)
+
+  - Drag & drop upload from VSCode explorer
+  - Click to open files — save to auto-push back to device (works with any editor, including SQLite3 Editor)
+  - Rename, create files/folders
+  - File size warning for large files
+  - Cache with configurable expiry (default 7 days)
+  - Independent device selection from build controls
+- **Feature Toggles** — Show/hide individual features (explorer, device selector, build controls, variant selector) in settings.
 - **i18n** — English and Japanese UI.
 
 ## Requirements
@@ -55,16 +66,28 @@ Build, install, and run Android native projects directly from VSCode — no Andr
 | `native-runner.appModule` | `"app"` | App module name (e.g., `app`, `mobile`, `wear`). |
 | `native-runner.buildVariant` | `"debug"` | Default build variant. Overridden by variant selector. |
 | `native-runner.autoSelectDevice` | `true` | Auto-select a device when one connects. |
+| `native-runner.showDeviceExplorer` | `true` | Show Device File Explorer in the sidebar. |
+| `native-runner.showDeviceSelector` | `true` | Show device selector in the status bar. |
+| `native-runner.showBuildControls` | `true` | Show Build/Run/Stop controls in the status bar. |
+| `native-runner.showVariantSelector` | `true` | Show build variant selector in the status bar. |
+| `native-runner.explorerFileSizeLimit` | `10` | File size limit (MB) for open/download warnings. 0 to disable. |
+| `native-runner.explorerCacheDays` | `7` | Days to keep cached files from Device Explorer. 0 to disable. |
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `Android Runner: Select Device` | Open the device picker |
-| `Android Runner: Select Build Variant` | Open the variant picker |
-| `Android Runner: Build, Install & Run` | Build and run the app |
-| `Android Runner: Stop App` | Stop the running app |
-| `Android Runner: Filter Log` | Filter logcat output by text |
+| `Native Runner: Select Device` | Open the device picker |
+| `Native Runner: Select Build Variant / Scheme` | Open the variant picker |
+| `Native Runner: Build, Install & Run` | Build and run the app |
+| `Native Runner: Stop App` | Stop the running app |
+| `Native Runner: Filter Log` | Filter logcat output by text |
+| `Native Runner: Select Explorer Device` | Pick device for file explorer |
+| `Native Runner: Download from Device` | Download file/folder from device |
+| `Native Runner: Upload to Device` | Upload files to device |
+| `Native Runner: New Folder` | Create folder on device |
+| `Native Runner: New File` | Create empty file on device |
+| `Native Runner: Rename` | Rename file/folder on device |
 
 ## F5 / launch.json
 

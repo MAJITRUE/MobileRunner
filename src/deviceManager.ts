@@ -30,9 +30,23 @@ export class DeviceManager implements vscode.Disposable {
     this.disposables.push(this.statusBarItem);
 
     this.updateStatusBar();
-    this.statusBarItem.show();
+    if (vscode.workspace.getConfiguration("native-runner").get<boolean>("showDeviceSelector", true)) {
+      this.statusBarItem.show();
+    }
 
-    this.startPolling();
+    this.disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("native-runner.showDeviceSelector")) {
+        const show = vscode.workspace.getConfiguration("native-runner").get<boolean>("showDeviceSelector", true);
+        if (show) { this.statusBarItem.show(); } else { this.statusBarItem.hide(); }
+      }
+      if (e.affectsConfiguration("native-runner.showDeviceSelector")
+        || e.affectsConfiguration("native-runner.showDeviceExplorer")
+        || e.affectsConfiguration("native-runner.showBuildControls")) {
+        if (this.needsPolling()) { this.startPolling(); } else { this.stopPolling(); }
+      }
+    }));
+
+    if (this.needsPolling()) { this.startPolling(); }
   }
 
   public getCurrentDevice(): Device | undefined {
@@ -333,6 +347,7 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   private startPolling(): void {
+    if (this.pollTimer) { return; }
     this.pollTimer = setInterval(async () => {
       const oldDeviceCount = this.devices.length;
       const oldDeviceId = this.currentDevice?.id;
@@ -343,12 +358,23 @@ export class DeviceManager implements vscode.Disposable {
     }, 4000);
   }
 
+  private stopPolling(): void {
+    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = undefined; }
+  }
+
+  private needsPolling(): boolean {
+    const config = vscode.workspace.getConfiguration("native-runner");
+    return config.get<boolean>("showDeviceSelector", true)
+      || config.get<boolean>("showDeviceExplorer", true)
+      || config.get<boolean>("showBuildControls", true);
+  }
+
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   dispose(): void {
-    if (this.pollTimer) { clearInterval(this.pollTimer); }
+    this.stopPolling();
     this.onDeviceChangedEmitter.dispose();
     for (const d of this.disposables) { d.dispose(); }
   }

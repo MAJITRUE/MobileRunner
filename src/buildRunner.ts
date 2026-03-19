@@ -49,6 +49,9 @@ export class BuildRunner implements vscode.Disposable {
     this.disposables.push(this.stopStatusBarItem);
 
     this.disposables.push(this.deviceManager.onDeviceChanged(() => this.updateStatusBar()));
+    this.disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("native-runner.showBuildControls")) { this.updateStatusBar(); }
+    }));
   }
 
   private getProviderForDevice(device: { platform: string }): PlatformProvider | undefined {
@@ -334,6 +337,13 @@ export class BuildRunner implements vscode.Disposable {
   }
 
   private updateStatusBar(): void {
+    const enabled = vscode.workspace.getConfiguration("native-runner").get<boolean>("showBuildControls", true);
+    if (!enabled) {
+      this.runStatusBarItem.hide();
+      this.buildingStatusBarItem.hide();
+      this.stopStatusBarItem.hide();
+      return;
+    }
     if (this.isBuildInProgress) {
       this.runStatusBarItem.hide();
       this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;

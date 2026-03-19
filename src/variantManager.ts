@@ -23,8 +23,17 @@ export class VariantManager implements vscode.Disposable {
     this.statusBarItem.command = "native-runner.selectVariant";
     this.statusBarItem.tooltip = vscode.l10n.t("Select Build Variant / Scheme");
     this.updateStatusBar();
-    this.statusBarItem.show();
+    if (vscode.workspace.getConfiguration("native-runner").get<boolean>("showVariantSelector", true)) {
+      this.statusBarItem.show();
+    }
     this.disposables.push(this.statusBarItem);
+
+    this.disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("native-runner.showVariantSelector")) {
+        const show = vscode.workspace.getConfiguration("native-runner").get<boolean>("showVariantSelector", true);
+        if (show) { this.statusBarItem.show(); } else { this.statusBarItem.hide(); }
+      }
+    }));
 
     // Invalidate cache when device changes (platform may change)
     this.disposables.push(

@@ -2,7 +2,7 @@
   "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {
@@ -27,6 +27,8 @@
     "adb",
     "gradle",
     "device",
+    "device-explorer",
+    "file-explorer",
     "mobile",
     "native",
     "build",
@@ -42,32 +44,169 @@
   "l10n": "./l10n",
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "native-runner-explorer",
+          "title": "%viewsContainers.explorer%",
+          "icon": "images/explorer-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "native-runner-explorer": [
+        {
+          "id": "deviceFileExplorer",
+          "name": "%views.deviceFileExplorer%",
+          "when": "config.native-runner.showDeviceExplorer"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "native-runner.selectDevice",
-        "title": "%command.selectDevice%"
+        "title": "%command.selectDevice%",
+        "category": "Native Runner"
       },
       {
         "command": "native-runner.run",
-        "title": "%command.run%"
+        "title": "%command.run%",
+        "category": "Native Runner"
       },
       {
         "command": "native-runner.stop",
-        "title": "%command.stop%"
+        "title": "%command.stop%",
+        "category": "Native Runner"
       },
       {
         "command": "native-runner.installAndRun",
-        "title": "%command.installAndRun%"
+        "title": "%command.installAndRun%",
+        "category": "Native Runner"
       },
       {
         "command": "native-runner.filterLog",
-        "title": "%command.filterLog%"
+        "title": "%command.filterLog%",
+        "category": "Native Runner"
       },
       {
         "command": "native-runner.selectVariant",
-        "title": "%command.selectVariant%"
+        "title": "%command.selectVariant%",
+        "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.refresh",
+        "title": "%command.fileExplorer.refresh%",
+        "category": "Native Runner",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "native-runner.fileExplorer.download",
+        "title": "%command.fileExplorer.download%",
+        "category": "Native Runner",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "native-runner.fileExplorer.upload",
+        "title": "%command.fileExplorer.upload%",
+        "category": "Native Runner",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "native-runner.fileExplorer.delete",
+        "title": "%command.fileExplorer.delete%",
+        "category": "Native Runner",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "native-runner.fileExplorer.copyPath",
+        "title": "%command.fileExplorer.copyPath%",
+        "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.openInEditor",
+        "title": "%command.fileExplorer.openInEditor%",
+        "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.newFolder",
+        "title": "%command.fileExplorer.newFolder%",
+        "category": "Native Runner",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "native-runner.fileExplorer.newFile",
+        "title": "%command.fileExplorer.newFile%",
+        "category": "Native Runner",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "native-runner.fileExplorer.rename",
+        "title": "%command.fileExplorer.rename%",
+        "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.selectDevice",
+        "title": "%command.fileExplorer.selectDevice%",
+        "category": "Native Runner",
+        "icon": "$(device-mobile)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "native-runner.fileExplorer.selectDevice",
+          "when": "view == deviceFileExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "native-runner.fileExplorer.refresh",
+          "when": "view == deviceFileExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "native-runner.fileExplorer.openInEditor",
+          "when": "view == deviceFileExplorer && viewItem == deviceFile",
+          "group": "1_open@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.download",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "2_transfer@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.upload",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
+          "group": "2_transfer@2"
+        },
+        {
+          "command": "native-runner.fileExplorer.newFolder",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
+          "group": "3_edit@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.newFile",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
+          "group": "3_edit@2"
+        },
+        {
+          "command": "native-runner.fileExplorer.rename",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "3_edit@3"
+        },
+        {
+          "command": "native-runner.fileExplorer.copyPath",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "4_copy@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.delete",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "5_danger@1"
+        }
+      ]
+    },
     "debuggers": [
       {
         "type": "native-runner",
@@ -116,6 +255,36 @@
           "type": "string",
           "default": "Debug",
           "description": "%config.iosConfiguration.description%"
+        },
+        "native-runner.showDeviceExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showDeviceExplorer.description%"
+        },
+        "native-runner.showDeviceSelector": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showDeviceSelector.description%"
+        },
+        "native-runner.showBuildControls": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showBuildControls.description%"
+        },
+        "native-runner.showVariantSelector": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showVariantSelector.description%"
+        },
+        "native-runner.explorerFileSizeLimit": {
+          "type": "number",
+          "default": 10,
+          "description": "%config.explorerFileSizeLimit.description%"
+        },
+        "native-runner.explorerCacheDays": {
+          "type": "number",
+          "default": 7,
+          "description": "%config.explorerCacheDays.description%"
         }
       }
     }
