@@ -1,6 +1,6 @@
 {
   "displayName": "Android / iOS Build & Run",
-  "description": "Build, install, and run Android & iOS apps directly from VSCode",
+  "description": "Build, install, and run Android & iOS apps directly from VSCode. Includes Device File Explorer.",
   "command.selectDevice": "Select Device",
   "command.run": "Run App",
   "command.stop": "Stop App",

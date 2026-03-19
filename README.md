@@ -1,6 +1,8 @@
 # Android / iOS Build & Run
 
-Build, install, and run Android & iOS apps directly from VSCode.
+<a href="#ja">日本語</a>
+
+Build, install, and run Android & iOS apps directly from VSCode. Includes Device File Explorer.
 
 ![Status Bar](images/statusbar.png)
 
@@ -33,9 +35,14 @@ Build, install, and run Android & iOS apps directly from VSCode.
 
 ## Requirements
 
+### Android
 - **Android SDK** with `adb` and `emulator`
 - **Gradle wrapper** (`gradlew` / `gradlew.bat`) in your project root
 - An Android project with `build.gradle` or `build.gradle.kts`
+
+### iOS (macOS only)
+- **Xcode** with Command Line Tools
+- An Xcode project (`.xcodeproj` or `.xcworkspace`)
 
 ## Quick Start
 
@@ -104,3 +111,64 @@ Add to `.vscode/launch.json`:
 ## License
 
 MIT
+
+[⬆️ Top](#android--ios-build--run) | [日本語](#ja)
+
+---
+
+<h2 id="ja">日本語</h2>
+
+VSCode から Android / iOS アプリをビルド・インストール・実行。Device File Explorer 搭載。
+
+![ステータスバー](images/statusbar.png)
+
+## 機能
+
+- **デバイス選択** — ステータスバーに現在のデバイスを表示。クリックでデバイス選択やエミュレーター起動。
+
+  ![デバイスピッカー](images/device-picker.png)
+
+- **ワンクリック実行** — ステータスバーの `▶ Run` でビルド・インストール・起動。
+- **マルチデバイス** — 複数デバイスで同時にアプリを実行。デバイスごとに独立したLogcat出力。
+- **ビルドバリアント選択** — Gradleビルドバリアント（`debug`、`release`、フレーバー）を自動スキャン。
+- **エミュレーターコールドブート** — VSCodeからエミュレーターを再起動。
+- **Debug ConsoleにLogcat** — PIDフィルター付きでアプリログをDebug Consoleに表示。
+- **フローティングツールバー** — Flutterと同様のデバッグツールバーで停止・再起動。
+- **F5対応** — `launch.json` でF5キーからビルド＆実行。
+- **SDK・JDK自動検出** — 環境変数、Android Studio、一般的なパスから自動検出。
+- **Device File Explorer** — デバイスのファイルをブラウズ・ダウンロード・アップロード・削除。`run-as` でアプリのプライベートデータにもアクセス。
+
+  ![デバイスエクスプローラー](images/device-explorer.png)
+
+  - VSCodeエクスプローラーからドラッグ&ドロップでアップロード
+  - クリックでファイルを開く — 保存時にデバイスへ自動書き戻し（SQLite3 Editor等のカスタムエディタも対応）
+  - リネーム、ファイル/フォルダー新規作成
+  - 大きなファイルのサイズ警告
+  - キャッシュ管理（デフォルト7日で自動削除）
+  - ビルド用セレクターとは独立したデバイス選択
+- **Feature Toggles** — 設定で各機能の表示ON/OFF。
+- **多言語対応** — 英語・日本語UI。
+
+## 必要条件
+
+### Android
+- **Android SDK**（`adb` と `emulator`）
+- プロジェクトルートに **Gradle wrapper**（`gradlew` / `gradlew.bat`）
+- `build.gradle` または `build.gradle.kts` を含むAndroidプロジェクト
+
+### iOS（macOSのみ）
+- **Xcode**（Command Line Tools含む）
+- Xcodeプロジェクト（`.xcodeproj` または `.xcworkspace`）
+
+## クイックスタート
+
+1. VSCodeでAndroidプロジェクトフォルダーを開く
+2. ステータスバーに接続中のデバイスが表示される（または「No Device」）
+3. デバイス名をクリックしてデバイスを選択またはエミュレーターを起動
+4. **▶ Run** をクリックしてビルド＆実行
+
+## ライセンス
+
+MIT
+
+[⬆️ Top](#android--ios-build--run) | [English](#android--ios-build--run)

@@ -1,28 +1,31 @@
 # Changelog
 
+## 0.5.1 (2026-03-20)
+
+- README i18n (English / Japanese sections with navigation links)
+- Added iOS requirements to README
+- Updated screenshots
+
 ## 0.5.0 (2026-03-20)
 
 - **Device File Explorer** — Browse, download, upload, and delete files on Android devices from the sidebar
-  - Storage / App Data / System の3カテゴリ構成
-  - `run-as` 対応でdebuggableアプリのprivateデータにアクセス可能（pull / push / delete / mkdir）
-  - ドラッグ&ドロップでVSCodeエクスプローラーからファイルをアップロード
-  - クリックでファイルをエディタで開く
-  - ファイル保存時にデバイスへ自動書き戻し（カスタムエディタ含む）
-  - マッピング永続化 — VSCode再起動後も書き戻しが動作
-  - キャッシュ管理 — 設定日数（デフォルト7日）を超えた古いキャッシュを自動削除
-  - ファイルサイズ警告 — 設定値（デフォルト10MB）超のファイルを開く/ダウンロード時に確認ダイアログ
-  - デバイス選択はビルド用セレクターと完全独立
-  - リネーム / 新規ファイル作成 / 新規フォルダー作成
-- **Feature toggles** — Settings で各機能の表示ON/OFF (`showDeviceExplorer`, `showDeviceSelector`, `showBuildControls`, `showVariantSelector`)
-  - 全機能OFFでデバイスポーリングも停止
-- Context menu labels simplified (removed "Native Runner:" prefix via `category` property)
+  - Storage / App Data / System category layout
+  - `run-as` support for debuggable app private data (pull / push / delete / mkdir)
+  - Drag & drop upload from VSCode explorer
+  - Click to open files in editor
+  - Auto-push back to device on save (works with any editor including custom editors)
+  - Cache management — auto-cleanup of files older than configurable days (default 7)
+  - File size warning — confirmation dialog for files exceeding configurable limit (default 10MB)
+  - Device selection independent from build selector
+  - Rename / new file / new folder
+- **Feature toggles** — Show/hide individual features in settings (`showDeviceExplorer`, `showDeviceSelector`, `showBuildControls`, `showVariantSelector`)
+  - All features OFF stops device polling
 
 ## 0.4.3 (2026-03-19)
 
 - Project root detection: walk up from active file (Dart-Code style) for reliable detection in nested projects
 - iOS simctl data caching (2s TTL) — device picker opens faster, reduced duplicate commands
 - devicectl timeout reduced from 15s to 5s
-- Device polling interval 3s → 4s (matches Dart-Code)
 
 ## 0.4.2 (2026-03-18)
 

@@ -1,6 +1,6 @@
 {
   "displayName": "Android / iOS Build & Run",
-  "description": "VSCode から Android / iOS アプリをビルド・インストール・実行",
+  "description": "VSCode から Android / iOS アプリをビルド・インストール・実行。Device File Explorer 搭載。",
   "command.selectDevice": "デバイスを選択",
   "command.run": "アプリを実行",
   "command.stop": "アプリを停止",
