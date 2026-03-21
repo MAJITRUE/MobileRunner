@@ -2,7 +2,7 @@
   "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {
@@ -35,11 +35,19 @@
     "run"
   ],
   "activationEvents": [
+    "workspaceContains:build.gradle",
+    "workspaceContains:build.gradle.kts",
+    "workspaceContains:app/build.gradle",
+    "workspaceContains:app/build.gradle.kts",
     "workspaceContains:**/build.gradle",
     "workspaceContains:**/build.gradle.kts",
     "workspaceContains:**/AndroidManifest.xml",
-    "workspaceContains:**/*.xcodeproj",
-    "workspaceContains:**/*.xcworkspace"
+    "workspaceContains:*.xcodeproj/project.pbxproj",
+    "workspaceContains:*.xcworkspace/contents.xcworkspacedata",
+    "workspaceContains:ios/*.xcodeproj/project.pbxproj",
+    "workspaceContains:ios/*.xcworkspace/contents.xcworkspacedata",
+    "workspaceContains:**/*.xcodeproj/project.pbxproj",
+    "workspaceContains:**/*.xcworkspace/contents.xcworkspacedata"
   ],
   "l10n": "./l10n",
   "main": "./out/extension.js",

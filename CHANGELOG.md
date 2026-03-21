@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2 (2026-03-21)
+
+- Fixed: Extension not activating on iOS projects (`.xcodeproj`/`.xcworkspace` are directories, not files — changed activation patterns to match files inside them)
+
 ## 0.5.1 (2026-03-20)
 
 - README i18n (English / Japanese sections with navigation links)
