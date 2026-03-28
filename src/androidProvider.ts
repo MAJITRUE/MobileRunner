@@ -2,7 +2,7 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as vscode from "vscode";
-import { Device, Emulator, PlatformProvider } from "./types";
+import { Device, Emulator, PlatformProvider, findProjectRootCommon } from "./types";
 
 export class AndroidProvider implements PlatformProvider {
   readonly platform = "android" as const;
@@ -344,31 +344,11 @@ export class AndroidProvider implements PlatformProvider {
   }
 
   public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
-    // Strategy 1: Walk up from active file
-    if (activeFilePath) {
-      let dir = path.dirname(activeFilePath);
-      while (dir !== path.dirname(dir)) {
-        if (this.hasGradleProject(dir) && !this.isFlutterProject(dir)) { return dir; }
-        dir = path.dirname(dir);
-      }
-    }
-
-    // Strategy 2: Scan workspace folders and one level of subdirectories
-    for (const folder of workspaceFolders) {
-      const root = folder.uri.fsPath;
-      if (this.hasGradleProject(root) && !this.isFlutterProject(root)) { return root; }
-
-      try {
-        const entries = fs.readdirSync(root, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
-            const subDir = path.join(root, entry.name);
-            if (this.hasGradleProject(subDir) && !this.isFlutterProject(subDir)) { return subDir; }
-          }
-        }
-      } catch { /* ignore */ }
-    }
-    return undefined;
+    return findProjectRootCommon(
+      (dir) => this.hasGradleProject(dir) && !this.isFlutterProject(dir),
+      workspaceFolders,
+      activeFilePath,
+    );
   }
 
   public async getPackageInfo(projectRoot: string, _variant: string, _artifactPath?: string): Promise<{

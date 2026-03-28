@@ -291,6 +291,13 @@
     "configuration": {
       "title": "Native Runner",
       "properties": {
+        "native-runner.projectSearchDepth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "%config.projectSearchDepth.description%"
+        },
         "native-runner.sdkPath": {
           "type": "string",
           "default": "",

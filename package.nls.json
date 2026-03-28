@@ -7,6 +7,7 @@
   "command.installAndRun": "Build, Install & Run",
   "command.filterLog": "Filter Log",
   "command.selectVariant": "Select Build Variant / Scheme",
+  "config.projectSearchDepth.description": "Max subdirectory depth to search for Android/iOS projects. 0 = root only, 2 = default.",
   "config.sdkPath.description": "Path to Android SDK. If empty, uses ANDROID_HOME or ANDROID_SDK_ROOT environment variable.",
   "config.javaHome.description": "Path to JDK. If empty, auto-detects from JAVA_HOME, Android Studio, or common install locations.",
   "config.appModule.description": "App module name (e.g., app, mobile, wear). Default: app.",
