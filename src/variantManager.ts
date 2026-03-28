@@ -150,7 +150,7 @@ export class VariantManager implements vscode.Disposable {
     if (!provider || !projectRoot) { return []; }
 
     this.scanning = true;
-    this.statusBarItem.text = `$(loading~spin) ${this.getSelectedVariant() || "..."}`;
+    this.statusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Scanning...")}`;
 
     this.scanPromise = (async () => {
       try {
@@ -166,6 +166,11 @@ export class VariantManager implements vscode.Disposable {
         this.cachedVariants = variants;
         if (variants.length > 0) {
           this.outputChannel?.info(vscode.l10n.t("Found variants: {0}", variants.join(", ")));
+          // Auto-select first variant if current selection is not in the list
+          const current = this.getSelectedVariant();
+          if (!variants.includes(current)) {
+            this.selectedVariant = variants[0];
+          }
         }
         this.updateStatusBar();
         return variants;
