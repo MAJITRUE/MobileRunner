@@ -189,18 +189,25 @@ export class VariantManager implements vscode.Disposable {
         }
         this.cachedProjects = projects;
 
-        // Restore previous selection or auto-select first variant of first project
+        // Restore previous selection from any project, or auto-select first
         const allVariants = projects.flatMap((p) => p.variants);
         if (allVariants.length > 0) {
-          const firstProject = projects[0];
-          const saved = this.workspaceState.get<string>(`variant:${firstProject.projectRoot}`);
-          const current = this.getSelectedVariant();
-          if (saved && allVariants.includes(saved)) {
-            this.selectedVariant = saved;
-            this.selectedProjectRoot = firstProject.projectRoot;
-          } else if (!allVariants.includes(current)) {
-            this.selectedVariant = allVariants[0];
-            this.selectedProjectRoot = firstProject.projectRoot;
+          let restored = false;
+          for (const proj of projects) {
+            const saved = this.workspaceState.get<string>(`variant:${proj.projectRoot}`);
+            if (saved && proj.variants.includes(saved)) {
+              this.selectedVariant = saved;
+              this.selectedProjectRoot = proj.projectRoot;
+              restored = true;
+              break;
+            }
+          }
+          if (!restored) {
+            const current = this.getSelectedVariant();
+            if (!allVariants.includes(current)) {
+              this.selectedVariant = projects[0].variants[0];
+              this.selectedProjectRoot = projects[0].projectRoot;
+            }
           }
         }
         this.updateStatusBar();
