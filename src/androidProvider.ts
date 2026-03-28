@@ -221,7 +221,7 @@ export class AndroidProvider implements PlatformProvider {
       // Step 2: cat outside run-as, pipe into run-as (single shell command string)
       await this.exec(this.getAdbPath(), [
         "-s", deviceId, "shell",
-        `cat ${this.sq(tmpRemote)} | run-as ${packageName} sh -c ${this.sq("cat > " + remotePath)}`,
+        `cat ${this.sq(tmpRemote)} | run-as ${packageName} sh -c ${this.sq("cat > " + this.sq(remotePath))}`,
       ], 120000);
     } finally {
       try { await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "rm", "-f", this.sq(tmpRemote)]); } catch { /* ignore */ }
