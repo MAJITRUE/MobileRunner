@@ -251,6 +251,18 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "native-runner.fileExplorer.rename",
+        "key": "f2",
+        "when": "focusedView == deviceFileExplorer && listFocus"
+      },
+      {
+        "command": "native-runner.fileExplorer.delete",
+        "key": "delete",
+        "when": "focusedView == deviceFileExplorer && listFocus"
+      }
+    ],
     "debuggers": [
       {
         "type": "native-runner",
