@@ -683,14 +683,23 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const fileName = item.data.entry?.name || path.posix.basename(item.data.remotePath);
     const localPath = path.join(tmpDir, fileName);
 
-    if (fs.existsSync(localPath)) {
-      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(localPath));
-    } else {
-      // File not cached yet — open the cache root
-      vscode.window.showInformationMessage(
-        vscode.l10n.t("File not cached. Open the file first, then use Reveal in Explorer.")
-      );
+    if (!fs.existsSync(localPath)) {
+      // Download first
+      const runAs = item.data.packageName || item.data.entry?.packageName;
+      try {
+        fs.mkdirSync(tmpDir, { recursive: true });
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Downloading...") },
+          async () => {
+            await this.service.pullFile(item.data.deviceId, item.data.remotePath, localPath, runAs);
+          }
+        );
+      } catch (err: any) {
+        vscode.window.showErrorMessage(vscode.l10n.t("Download failed: {0}", err?.message || String(err)));
+        return;
+      }
     }
+    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(localPath));
   }
 
   private cleanExpiredCache(): void {
