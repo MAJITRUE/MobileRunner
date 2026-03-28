@@ -247,6 +247,27 @@ export class IosProvider implements PlatformProvider {
     const isSimulator = device.type === "emulator";
     const derivedDataPath = path.join(projectRoot, "build", "DerivedData");
 
+    // Auto-boot simulator if shutdown
+    if (isSimulator) {
+      try {
+        const { json } = await this.getSimctlData();
+        let isBooted = false;
+        for (const runtimeDevices of Object.values(json.devices || {})) {
+          for (const sim of runtimeDevices as any[]) {
+            if (sim.udid === device.id && sim.state === "Booted") {
+              isBooted = true;
+              break;
+            }
+          }
+          if (isBooted) { break; }
+        }
+        if (!isBooted) {
+          outputChannel.info(vscode.l10n.t("  Booting simulator..."));
+          await this.exec("xcrun", ["simctl", "boot", device.id], 30000);
+        }
+      } catch { /* ignore — xcodebuild may boot it anyway */ }
+    }
+
     const args = [
       xcodeProject.type === "workspace" ? "-workspace" : "-project",
       xcodeProject.path,
