@@ -338,7 +338,10 @@ export class BuildRunner implements vscode.Disposable {
 
   private updateStatusBar(): void {
     const enabled = vscode.workspace.getConfiguration("native-runner").get<boolean>("showBuildControls", true);
-    if (!enabled) {
+    const currentDevice = this.deviceManager.getCurrentDevice();
+    const hasOnlineDevice = currentDevice !== undefined && currentDevice.isOnline;
+
+    if (!enabled || !hasOnlineDevice) {
       this.runStatusBarItem.hide();
       this.buildingStatusBarItem.hide();
       this.stopStatusBarItem.hide();
@@ -351,8 +354,7 @@ export class BuildRunner implements vscode.Disposable {
       this.buildingStatusBarItem.show();
       this.stopStatusBarItem.show();
     } else {
-      const currentDevice = this.deviceManager.getCurrentDevice();
-      const currentDeviceRunning = currentDevice && this.sessions.has(currentDevice.id);
+      const currentDeviceRunning = this.sessions.has(currentDevice.id);
       if (currentDeviceRunning) {
         this.runStatusBarItem.hide();
         this.stopStatusBarItem.show();

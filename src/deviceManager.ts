@@ -341,6 +341,9 @@ export class DeviceManager implements vscode.Disposable {
   }
 
   private updateStatusBar(): void {
+    const hasDevice = this.currentDevice !== undefined && this.currentDevice.isOnline;
+    vscode.commands.executeCommand("setContext", "native-runner.hasOnlineDevice", hasDevice);
+
     if (this.currentDevice) {
       const icon = this.deviceIcon(this.currentDevice);
       this.statusBarItem.text = `${icon} ${this.currentDevice.name}`;

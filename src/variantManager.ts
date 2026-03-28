@@ -188,8 +188,18 @@ export class VariantManager implements vscode.Disposable {
   }
 
   private updateStatusBar(): void {
+    const enabled = vscode.workspace.getConfiguration("native-runner").get<boolean>("showVariantSelector", true);
+    const currentDevice = this.deviceManager.getCurrentDevice();
+    const hasOnlineDevice = currentDevice !== undefined && currentDevice.isOnline;
+
+    if (!enabled || !hasOnlineDevice) {
+      this.statusBarItem.hide();
+      return;
+    }
+
     const variant = this.getSelectedVariant();
     this.statusBarItem.text = `$(package) ${variant || "—"}`;
+    this.statusBarItem.show();
   }
 
   public invalidateCache(): void {
