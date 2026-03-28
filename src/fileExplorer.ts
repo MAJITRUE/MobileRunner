@@ -515,12 +515,11 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       await this.service.renameFile(item.data.deviceId, item.data.remotePath, newPath, runAs);
 
       // Update local cache file and reopen editor if the file was open
-      const oldHash = crypto.createHash("md5").update(item.data.deviceId + ":" + item.data.remotePath).digest("hex").slice(0, 8);
-      const oldLocalPath = path.join(this.tmpRoot, oldHash, item.data.entry.name);
-      const oldKey = normalizeKey(oldLocalPath);
+      const oldLocalPath = this.resolveLocalPath(item.data.deviceId, item.data.remotePath, item.data.entry.name);
 
-      if (fs.existsSync(oldLocalPath)) {
-        const newLocalPath = path.join(this.tmpRoot, oldHash, newName);
+      if (oldLocalPath) {
+        const oldKey = normalizeKey(oldLocalPath);
+        const newLocalPath = path.join(path.dirname(oldLocalPath), newName);
 
         // Stop watcher before rename
         this.unwatchFile(oldKey);
@@ -592,11 +591,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     if (!item?.data?.deviceId || !item?.data?.remotePath || !item.data.entry) { return; }
     if (!await this.confirmLargeFile(item)) { return; }
 
-    // Use hash to avoid same-name collisions from different remote paths
-    const hash = crypto.createHash("md5").update(item.data.deviceId + ":" + item.data.remotePath).digest("hex").slice(0, 8);
-    const tmpDir = path.join(this.tmpRoot, hash);
-    fs.mkdirSync(tmpDir, { recursive: true });
-    const localPath = path.join(tmpDir, item.data.entry.name);
+    const localPath = this.getOrCreateLocalPath(item.data.deviceId, item.data.remotePath, item.data.entry.name);
 
     const runAs = item.data.packageName || item.data.entry.packageName;
     try {
@@ -784,20 +779,18 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
 
     // Check if this file has been opened/cached locally
-    const hash = crypto.createHash("md5").update(item.data.deviceId + ":" + item.data.remotePath).digest("hex").slice(0, 8);
-    const tmpDir = path.join(this.tmpRoot, hash);
     const fileName = item.data.entry?.name || path.posix.basename(item.data.remotePath);
-    const localPath = path.join(tmpDir, fileName);
+    let localPath = this.resolveLocalPath(item.data.deviceId, item.data.remotePath, fileName);
 
-    if (!fs.existsSync(localPath)) {
-      // Download first
+    if (!localPath) {
+      // Not cached — download first
+      localPath = this.getOrCreateLocalPath(item.data.deviceId, item.data.remotePath, fileName);
       const runAs = item.data.packageName || item.data.entry?.packageName;
       try {
-        fs.mkdirSync(tmpDir, { recursive: true });
         await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Downloading...") },
           async () => {
-            await this.service.pullFile(item.data.deviceId, item.data.remotePath, localPath, runAs);
+            await this.service.pullFile(item.data.deviceId, item.data.remotePath, localPath!, runAs);
           }
         );
       } catch (err: any) {
@@ -812,27 +805,13 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
    * Close editor tab and clean up local cache for a remote file
    */
   private async closeAndCleanupCachedFile(deviceId: string, remotePath: string, fileName?: string): Promise<void> {
-    // Find local path from openedFiles (handles renamed files correctly)
-    let localPath: string | undefined;
-    let key: string | undefined;
-    for (const [k, info] of this.openedFiles) {
-      if (info.deviceId === deviceId && info.remotePath === remotePath) {
-        localPath = info.localPath;
-        key = k;
-        break;
-      }
-    }
+    const localPath = this.resolveLocalPath(deviceId, remotePath, fileName);
+    if (!localPath) { return; }
 
-    // Fallback: compute from hash (file may not be in openedFiles)
-    if (!localPath) {
-      const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
-      const name = fileName || path.posix.basename(remotePath);
-      localPath = path.join(this.tmpRoot, hash, name);
-      key = normalizeKey(localPath);
-    }
+    const key = normalizeKey(localPath);
 
     // Close editor tab if open
-    const normalizedLocal = normalizeKey(localPath);
+    const normalizedLocal = key;
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         const input = tab.input;
@@ -846,7 +825,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
 
     // Stop watcher and remove mapping
-    if (key) { this.unwatchFile(key); }
+    this.unwatchFile(key);
 
     // Delete local cache
     if (fs.existsSync(localPath)) {
@@ -887,6 +866,36 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         }
       }
     }
+  }
+
+  /**
+   * Resolve the local cache path for a remote file.
+   * Checks openedFiles first (handles renamed files), falls back to hash computation.
+   * Returns undefined if no cached file exists.
+   */
+  private resolveLocalPath(deviceId: string, remotePath: string, fileName?: string): string | undefined {
+    for (const [, info] of this.openedFiles) {
+      if (info.deviceId === deviceId && info.remotePath === remotePath) {
+        return info.localPath;
+      }
+    }
+    const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
+    const name = fileName || path.posix.basename(remotePath);
+    const localPath = path.join(this.tmpRoot, hash, name);
+    return fs.existsSync(localPath) ? localPath : undefined;
+  }
+
+  /**
+   * Get or create the local cache path for a remote file.
+   * Reuses existing path if found, otherwise creates a new hash directory.
+   */
+  private getOrCreateLocalPath(deviceId: string, remotePath: string, fileName: string): string {
+    const existing = this.resolveLocalPath(deviceId, remotePath, fileName);
+    if (existing) { return existing; }
+    const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
+    const tmpDir = path.join(this.tmpRoot, hash);
+    fs.mkdirSync(tmpDir, { recursive: true });
+    return path.join(tmpDir, fileName);
   }
 
   /**

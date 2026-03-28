@@ -158,11 +158,11 @@ export class AndroidProvider implements PlatformProvider {
   // --- File Explorer ---
 
   public async listFiles(deviceId: string, remotePath: string): Promise<string> {
-    return this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "ls", "-la", remotePath], 15000);
+    return this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "ls", "-la", this.sq(remotePath)], 15000);
   }
 
   public async runAsListFiles(deviceId: string, packageName: string, remotePath: string): Promise<string> {
-    return this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "ls", "-la", remotePath], 15000);
+    return this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "ls", "-la", this.sq(remotePath)], 15000);
   }
 
   public async listPackages(deviceId: string): Promise<string[]> {
@@ -182,11 +182,11 @@ export class AndroidProvider implements PlatformProvider {
   }
 
   public async deleteFile(deviceId: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "rm", "-rf", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "rm", "-rf", this.sq(remotePath)]);
   }
 
   public async makeDirectory(deviceId: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mkdir", "-p", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mkdir", "-p", this.sq(remotePath)]);
   }
 
   public async runAsPullFile(deviceId: string, packageName: string, remotePath: string, localPath: string): Promise<void> {
@@ -194,7 +194,7 @@ export class AndroidProvider implements PlatformProvider {
     const fs = await import("fs");
     return new Promise<void>((resolve, reject) => {
       const proc = cp.spawn(this.getAdbPath(), [
-        "-s", deviceId, "exec-out", "run-as", packageName, "cat", remotePath,
+        "-s", deviceId, "exec-out", "run-as", packageName, "cat", this.sq(remotePath),
       ]);
       const ws = fs.createWriteStream(localPath);
       proc.stdout.pipe(ws);
@@ -215,58 +215,57 @@ export class AndroidProvider implements PlatformProvider {
 
   public async runAsPushFile(deviceId: string, packageName: string, localPath: string, remotePath: string): Promise<void> {
     const tmpRemote = "/data/local/tmp/_nr_upload_tmp";
-    const escaped = remotePath.replace(/"/g, '\\"');
     try {
       // Step 1: push to world-writable tmp
       await this.pushFile(deviceId, localPath, tmpRemote);
       // Step 2: cat outside run-as, pipe into run-as (single shell command string)
       await this.exec(this.getAdbPath(), [
         "-s", deviceId, "shell",
-        `cat ${tmpRemote} | run-as ${packageName} sh -c 'cat > "${escaped}"'`,
+        `cat ${this.sq(tmpRemote)} | run-as ${packageName} sh -c 'cat > '${this.sq(remotePath)}`,
       ], 120000);
     } finally {
-      try { await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "rm", "-f", tmpRemote]); } catch { /* ignore */ }
+      try { await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "rm", "-f", this.sq(tmpRemote)]); } catch { /* ignore */ }
     }
   }
 
   public async runAsDeleteFile(deviceId: string, packageName: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "rm", "-rf", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "rm", "-rf", this.sq(remotePath)]);
   }
 
   public async runAsMakeDirectory(deviceId: string, packageName: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mkdir", "-p", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mkdir", "-p", this.sq(remotePath)]);
   }
 
   public async renameFile(deviceId: string, oldPath: string, newPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mv", oldPath, newPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mv", this.sq(oldPath), this.sq(newPath)]);
   }
 
   public async runAsRenameFile(deviceId: string, packageName: string, oldPath: string, newPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", oldPath, newPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", this.sq(oldPath), this.sq(newPath)]);
   }
 
   public async moveFile(deviceId: string, srcPath: string, destPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mv", srcPath, destPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mv", this.sq(srcPath), this.sq(destPath)]);
   }
 
   public async runAsMoveFile(deviceId: string, packageName: string, srcPath: string, destPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", srcPath, destPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", this.sq(srcPath), this.sq(destPath)]);
   }
 
   public async copyFile(deviceId: string, srcPath: string, destPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "cp", "-r", srcPath, destPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "cp", "-r", this.sq(srcPath), this.sq(destPath)]);
   }
 
   public async runAsCopyFile(deviceId: string, packageName: string, srcPath: string, destPath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "cp", "-r", srcPath, destPath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "cp", "-r", this.sq(srcPath), this.sq(destPath)]);
   }
 
   public async touchFile(deviceId: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "touch", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "touch", this.sq(remotePath)]);
   }
 
   public async runAsTouchFile(deviceId: string, packageName: string, remotePath: string): Promise<void> {
-    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "touch", remotePath]);
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "touch", this.sq(remotePath)]);
   }
 
   // --- Logging ---
@@ -473,6 +472,11 @@ export class AndroidProvider implements PlatformProvider {
   private getEmulatorPath(): string {
     const exe = process.platform === "win32" ? "emulator.exe" : "emulator";
     return this.sdkPath ? path.join(this.sdkPath, "emulator", exe) : exe;
+  }
+
+  /** Quote a path for use in adb shell commands (POSIX single-quote escaping) */
+  private sq(p: string): string {
+    return "'" + p.replace(/'/g, "'\\''") + "'";
   }
 
   private exec(command: string, args: string[], timeoutMs = 10000): Promise<string> {

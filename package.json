@@ -268,7 +268,7 @@
         "command": "native-runner.fileExplorer.revealInExplorer",
         "key": "shift+alt+r",
         "mac": "cmd+alt+r",
-        "when": "focusedView == deviceFileExplorer && listFocus"
+        "when": "focusedView == deviceFileExplorer && listFocus && viewItem =~ /deviceFile/"
       },
       {
         "command": "native-runner.fileExplorer.copyPath",
