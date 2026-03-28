@@ -376,6 +376,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const targets = this.resolveItems(item, items);
     if (targets.length === 0) { return; }
 
+    // Size warning for single file download
+    if (targets.length === 1 && !await this.confirmLargeFile(targets[0])) { return; }
+
     const targetDir = await vscode.window.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,
@@ -390,7 +393,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         async () => {
           for (const t of targets) {
             const runAs = t.data.packageName || t.data.entry?.packageName;
-            const localDest = path.join(targetDir[0].fsPath, path.posix.basename(t.data.remotePath));
+            const localDest = this.uniqueLocalPath(targetDir[0].fsPath, path.posix.basename(t.data.remotePath));
             await this.service.pullFile(t.data.deviceId, t.data.remotePath, localDest, runAs);
           }
         }
@@ -886,6 +889,23 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
+  /**
+   * Generate a unique local file path, appending (1), (2), etc. if the file already exists.
+   */
+  private uniqueLocalPath(dir: string, fileName: string): string {
+    let candidate = path.join(dir, fileName);
+    if (!fs.existsSync(candidate)) { return candidate; }
+
+    const ext = path.extname(fileName);
+    const base = path.basename(fileName, ext);
+    let i = 1;
+    while (fs.existsSync(candidate)) {
+      candidate = path.join(dir, `${base} (${i})${ext}`);
+      i++;
+    }
+    return candidate;
+  }
+
   private resolveItems(item: FileExplorerItem, items?: FileExplorerItem[]): FileExplorerItem[] {
     if (items && items.length > 0) {
       return items.filter((i) => i.data?.deviceId && i.data?.remotePath);
@@ -908,12 +928,16 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         const dirPath = path.join(this.tmpRoot, dir);
         const stat = fs.statSync(dirPath);
         if (stat.isDirectory() && (now - stat.mtimeMs) > maxAge) {
-          // Remove corresponding mappings
+          // Remove corresponding mappings (collect keys first to avoid mutation during iteration)
+          const expiredKeys: string[] = [];
           for (const [key, info] of this.openedFiles) {
             if (normalizeKey(info.localPath).startsWith(normalizeKey(dirPath))) {
-              this.unwatchFile(key);
-              cleaned = true;
+              expiredKeys.push(key);
             }
+          }
+          for (const key of expiredKeys) {
+            this.unwatchFile(key);
+            cleaned = true;
           }
           fs.rmSync(dirPath, { recursive: true, force: true });
         }
