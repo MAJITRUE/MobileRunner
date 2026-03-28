@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.4 (2026-03-28)
+
+- **Device Explorer: Cache Clear** — Toolbar button to clear local cache with size display; skips files open in editor
+- **Device Explorer: Reveal in File Explorer** — Right-click to open cached file in OS file manager; auto-downloads if not cached
+- **Device Explorer: Multi-select** — Shift/Ctrl+Click for batch delete, download, move, copy, copy path
+- **Device Explorer: Keyboard shortcuts** — F2/Enter(mac) rename, Delete/Cmd+Backspace delete, Shift+Alt+R reveal, Shift+Alt+C copy path
+- **Smart folder caching** — Folders re-fetch only when collapsed and re-expanded (not on every expand)
+- **Move To / Copy To improvements** — Initial value includes filename, auto-creates non-existent destination folders
+- **Device disconnect handling** — Tree clears, toolbar hides, watchers stop automatically
+- **No-device state** — Run/Stop/Variant hidden when no device connected
+- **Context menu reordered** — VSCode-standard layout (Reveal → Transfer → Move/Copy → Copy Path → New → Rename → Delete)
+- **ADB path quoting** — All shell commands use POSIX single-quote escaping for spaces, Japanese, special characters
+- **Refactored local path resolution** — Centralized `resolveLocalPath`/`getOrCreateLocalPath` to prevent hash mismatch bugs after rename
+- Fixed: Rename updates editor tab name
+- Fixed: Delete/move closes associated editor tabs (including folder contents)
+- Fixed: Binary files (images) open correctly
+- Fixed: Drag & drop folder move shows confirmation dialog
+- Fixed: run-as file operations (App Data) with correct shell quoting
+
 ## 0.5.3 (2026-03-28)
 
 - **Device Explorer: Move & Copy** — Right-click "Move To..." / "Copy To..." for files and folders on device

@@ -80,7 +80,6 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 | `native-runner.showVariantSelector` | `true` | Show build variant selector in the status bar. |
 | `native-runner.explorerFileSizeLimit` | `10` | File size limit (MB) for open/download warnings. 0 to disable. |
 | `native-runner.explorerCacheDays` | `7` | Days to keep cached files from Device Explorer. 0 to disable. |
-| `native-runner.explorerRefreshOnExpand` | `true` | Re-fetch folder contents on each expand. Set to false for cached mode. |
 
 ## Commands
 
@@ -99,6 +98,8 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 | `Native Runner: Rename` | Rename file/folder on device |
 | `Native Runner: Move To...` | Move file/folder to another location on device |
 | `Native Runner: Copy To...` | Copy file/folder to another location on device |
+| `Native Runner: Reveal in File Explorer` | Open cached file in OS file manager |
+| `Native Runner: Clear Cache` | Clear local file cache |
 
 ## F5 / launch.json
 
@@ -148,8 +149,10 @@ VSCode から Android / iOS アプリをビルド・インストール・実行�
   - クリックでファイルを開く — 保存時にデバイスへ自動書き戻し（SQLite3 Editor等のカスタムエディタも対応）
   - リネーム、ファイル/フォルダー新規作成、移動、コピー
   - デバイス内ドラッグ&ドロップでファイル移動
-  - 大きなファイルのサイズ警告
-  - キャッシュ管理（デフォルト7日で自動削除）
+  - Shift/Ctrl+クリックで複数選択（一括削除・ダウンロード・移動・コピー）
+  - エクスプローラーで表示（Shift+Alt+R）、パスコピー（Shift+Alt+C）
+  - キャッシュ管理（ツールバーからクリア、デフォルト7日で自動削除）
+  - スペース・日本語ファイル名対応
   - ビルド用セレクターとは独立したデバイス選択
 - **Feature Toggles** — 設定で各機能の表示ON/OFF。
 - **多言語対応** — 英語・日本語UI。
