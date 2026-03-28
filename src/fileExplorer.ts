@@ -671,19 +671,38 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     );
     if (!confirm) { return; }
 
-    // Stop all watchers and clear mappings
-    for (const [key] of this.openedFiles) {
-      this.unwatchFile(key);
+    // Collect directories that have open files (skip these)
+    const openDirs = new Set<string>();
+    for (const [, info] of this.openedFiles) {
+      const dir = path.dirname(info.localPath);
+      const relative = path.relative(this.tmpRoot, dir).split(path.sep)[0];
+      if (relative) { openDirs.add(relative); }
     }
-    this.openedFiles.clear();
-    this.saveMappings();
 
-    // Delete cache directory
+    // Delete cache subdirectories, skipping open file dirs
+    let cleared = 0;
     if (fs.existsSync(this.tmpRoot)) {
-      fs.rmSync(this.tmpRoot, { recursive: true, force: true });
+      try {
+        for (const dir of fs.readdirSync(this.tmpRoot)) {
+          if (dir.startsWith("_")) { continue; }
+          if (openDirs.has(dir)) { continue; } // skip — file is open in editor
+          const dirPath = path.join(this.tmpRoot, dir);
+          const stat = fs.statSync(dirPath);
+          if (stat.isDirectory()) {
+            fs.rmSync(dirPath, { recursive: true, force: true });
+            cleared++;
+          }
+        }
+      } catch { /* ignore */ }
     }
 
-    vscode.window.showInformationMessage(vscode.l10n.t("Cache cleared ({0})", sizeStr));
+    if (openDirs.size > 0) {
+      vscode.window.showInformationMessage(
+        vscode.l10n.t("Cache cleared. {0} file(s) in use were skipped.", openDirs.size)
+      );
+    } else {
+      vscode.window.showInformationMessage(vscode.l10n.t("Cache cleared ({0})", sizeStr));
+    }
   }
 
   getCacheSizeFormatted(): string {
