@@ -3,114 +3,94 @@
 <a href="#ja">日本語</a>
 
 Build, install, and run Android & iOS apps directly from VSCode. Includes Device File Explorer.
+Inspired by Flutter's developer experience — status bar device selector, one-click run, and floating toolbar.
 
-![Status Bar](images/statusbar.png)
+## Build & Run
 
-## Features
+Pick a device, select a variant, click Run.
 
-- **Device Selector** — Status bar shows the current device. Click to pick from connected devices or launch an emulator.
+![Status Bar](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/statusbar.png)
 
-  ![Device Picker](images/device-picker.png)
+The status bar shows your current device, build variant, and run button. Click any item to change it.
 
-- **One-Click Run** — Click `▶ Run` in the status bar to build, install, and launch your app.
-- **Multi-Device** — Run the app on multiple devices at the same time. Each device gets its own logcat Output Channel.
-- **Build Variant Selector** — Shows all variants/schemes from all projects in workspace with project name sections. Remembers last selection per project.
-- **Emulator Cold Boot** — Restart an emulator from scratch without leaving VSCode.
-- **Logcat in Debug Console** — App logs streamed to the Debug Console, filtered by your app's PID.
-- **Floating Toolbar** — Stop and restart your app from the debug toolbar, just like Flutter.
-- **F5 Support** — Press F5 to build & run via `launch.json`.
-- **Auto-detect SDK & JDK** — Finds Android SDK and JDK from environment variables, Android Studio, or common install paths.
-- **Device File Explorer** — Browse, download, upload, and delete files on connected devices. Supports app-private data via `run-as`.
+![Device Picker](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/device-picker.png)
 
-  ![Device Explorer](images/device-explorer.png)
+The variant picker shows all projects in the workspace with their variants/schemes.
 
-  - Drag & drop upload from VSCode explorer
-  - Click to open files — save to auto-push back to device (works with any editor, including SQLite3 Editor)
-  - Rename, create files/folders, move, copy
-  - Drag & drop within tree to move files on device
-  - File size warning for large files
-  - Cache with configurable expiry (default 7 days)
-  - Independent device selection from build controls
-- **Feature Toggles** — Show/hide individual features (explorer, device selector, build controls, variant selector) in settings.
-- **i18n** — English and Japanese UI.
+![Variant Picker](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/variant.png)
+
+**Multiple Devices**
+Run on multiple devices simultaneously. Each gets its own log output.
+
+**Floating Toolbar**
+Stop and restart your app from the debug toolbar, just like Flutter.
+
+**F5 Support**
+Press F5 to build and run via `launch.json`.
+
+**Cold Boot & Auto-Boot**
+Restart an emulator from scratch (cold boot). iOS simulators auto-start if shutdown.
+
+**Auto-Detection**
+SDK, JDK, and project root are detected automatically.
+
+## Device File Explorer
+
+Browse, edit, and manage files on connected Android devices from the sidebar.
+
+![Device Explorer](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/device-explorer.png)
+
+**Open & Auto-Sync**
+Click a file to open. Save to sync changes back to device automatically. Files open with the appropriate VSCode editor (text, image preview, SQLite3 Editor, etc.).
+
+**Drag & Drop**
+Move files within the device tree, or upload from local by dropping onto a folder.
+
+**Multi-Select**
+Shift/Ctrl+Click for batch delete, download, move, copy, and copy path.
+
+**App-Private Data**
+Access databases, shared_prefs, and other private data on debuggable apps.
+
+**Keyboard Shortcuts**
+| Action | Windows | macOS |
+|--------|---------|-------|
+| Rename | F2 | Enter |
+| Delete | Delete | Cmd+Backspace |
+| Reveal in Explorer | Shift+Alt+R | Cmd+Alt+R |
+| Copy Path | Shift+Alt+C | Cmd+Alt+C |
 
 ## Requirements
 
-### Android
-- **Android SDK** with `adb` and `emulator`
-- **Gradle wrapper** (`gradlew` / `gradlew.bat`) in your project root
-- An Android project with `build.gradle` or `build.gradle.kts`
+**Android** — Android SDK (`adb`, `emulator`), Gradle wrapper, `build.gradle` or `build.gradle.kts`
 
-### iOS (macOS only)
-- **Xcode** with Command Line Tools
-- An Xcode project (`.xcodeproj` or `.xcworkspace`)
+**iOS (macOS only)** — Xcode with Command Line Tools, `.xcodeproj` or `.xcworkspace`
 
 ## Quick Start
 
-1. Open an Android project folder in VSCode
-2. The status bar shows your connected device (or "No Device")
-3. Click the device name to select a device or launch an emulator
-4. Click **▶ Run** to build and run
+1. Open a project folder in VSCode
+2. Click the device name in the status bar to select a device
+3. Click **▶ Run** to build and run
 
-## Status Bar
-
-```
-[📱 Pixel 7] [📦 debug] [▶ Run]
-```
-
-| Item | Description |
-|------|-------------|
-| `📱 Pixel 7` | Selected device. Click to open device picker. |
-| `📦 debug` | Current build variant/scheme. Click to select from all projects. |
-| `▶ Run` | Build, install, and launch. Shows spinner during build. |
-| `⬜ Stop` | Stop the app on the selected device. Visible only while running. |
-
-## Extension Settings
+## Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `native-runner.projectSearchDepth` | `2` | Max subdirectory depth to search for Android/iOS projects. |
-| `native-runner.sdkPath` | `""` | Path to Android SDK. Auto-detected if empty. |
-| `native-runner.javaHome` | `""` | Path to JDK. Auto-detected if empty. |
-| `native-runner.appModule` | `"app"` | App module name (e.g., `app`, `mobile`, `wear`). |
-| `native-runner.buildVariant` | `"debug"` | Default build variant. Overridden by variant selector. |
-| `native-runner.autoSelectDevice` | `true` | Auto-select a device when one connects. |
-| `native-runner.showDeviceExplorer` | `true` | Show Device File Explorer in the sidebar. |
-| `native-runner.showDeviceSelector` | `true` | Show device selector in the status bar. |
-| `native-runner.showBuildControls` | `true` | Show Build/Run/Stop controls in the status bar. |
-| `native-runner.showVariantSelector` | `true` | Show build variant selector in the status bar. |
-| `native-runner.explorerFileSizeLimit` | `10` | File size limit (MB) for open/download warnings. 0 to disable. |
-| `native-runner.explorerCacheDays` | `7` | Days to keep cached files from Device Explorer. 0 to disable. |
+| `projectSearchDepth` | `2` | Max depth to search for projects in subdirectories |
+| `sdkPath` | `""` | Android SDK path (auto-detected) |
+| `javaHome` | `""` | JDK path (auto-detected) |
+| `buildVariant` | `"debug"` | Default build variant |
+| `autoSelectDevice` | `true` | Auto-select device on connect |
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `Native Runner: Select Device` | Open the device picker |
-| `Native Runner: Select Build Variant / Scheme` | Open the variant picker |
-| `Native Runner: Build, Install & Run` | Build and run the app |
-| `Native Runner: Stop App` | Stop the running app |
-| `Native Runner: Filter Log` | Filter logcat output by text |
-| `Native Runner: Select Explorer Device` | Pick device for file explorer |
-| `Native Runner: Download from Device` | Download file/folder from device |
-| `Native Runner: Upload to Device` | Upload files to device |
-| `Native Runner: New Folder` | Create folder on device |
-| `Native Runner: New File` | Create empty file on device |
-| `Native Runner: Rename` | Rename file/folder on device |
-| `Native Runner: Move To...` | Move file/folder to another location on device |
-| `Native Runner: Copy To...` | Copy file/folder to another location on device |
-| `Native Runner: Reveal in File Explorer` | Open cached file in OS file manager |
-| `Native Runner: Clear Cache` | Clear local file cache |
+All settings are prefixed with `native-runner.`. Additional settings for feature toggles (`showDeviceExplorer`, `showDeviceSelector`, `showBuildControls`, `showVariantSelector`) and file explorer (`explorerFileSizeLimit`, `explorerCacheDays`) are available in VSCode settings.
 
 ## F5 / launch.json
-
-Add to `.vscode/launch.json`:
 
 ```json
 {
   "type": "native-runner",
   "request": "launch",
-  "name": "Android Build & Run"
+  "name": "Build & Run"
 }
 ```
 
@@ -124,57 +104,75 @@ MIT
 
 <h2 id="ja">日本語</h2>
 
-VSCode から Android / iOS アプリをビルド・インストール・実行。Device File Explorer 搭載。
+VSCode から Android / iOS ネイティブアプリをビルド・実行できる拡張機能。Device File Explorer 搭載。
+Flutter の開発者エクスペリエンス — ステータスバーでのデバイス選択、ワンクリック実行、フローティングツールバーからインスピレーションを受けています。
 
-![ステータスバー](images/statusbar.png)
+## ビルド & 実行
 
-## 機能
+デバイスを選んで、バリアントを選んで、実行。
 
-- **デバイス選択** — ステータスバーに現在のデバイスを表示。クリックでデバイス選択やエミュレーター起動。
+![ステータスバー](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/statusbar.png)
 
-  ![デバイスピッカー](images/device-picker.png)
+ステータスバーにデバイス・ビルドバリアント・実行ボタンを表示。クリックで切り替え。
 
-- **ワンクリック実行** — ステータスバーの `▶ Run` でビルド・インストール・起動。
-- **マルチデバイス** — 複数デバイスで同時にアプリを実行。デバイスごとに独立したLogcat出力。
-- **ビルドバリアント選択** — ワークスペース内の全プロジェクトのバリアント/スキームをプロジェクト名付きで表示。前回の選択を記憶。
-- **エミュレーターコールドブート** — VSCodeからエミュレーターを再起動。
-- **Debug ConsoleにLogcat** — PIDフィルター付きでアプリログをDebug Consoleに表示。
-- **フローティングツールバー** — Flutterと同様のデバッグツールバーで停止・再起動。
-- **F5対応** — `launch.json` でF5キーからビルド＆実行。
-- **SDK・JDK自動検出** — 環境変数、Android Studio、一般的なパスから自動検出。
-- **Device File Explorer** — デバイスのファイルをブラウズ・ダウンロード・アップロード・削除。`run-as` でアプリのプライベートデータにもアクセス。
+![デバイスピッカー](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/device-picker.png)
 
-  ![デバイスエクスプローラー](images/device-explorer.png)
+バリアントピッカーはワークスペース内の全プロジェクトをプロジェクト名付きで表示。
 
-  - VSCodeエクスプローラーからドラッグ&ドロップでアップロード
-  - クリックでファイルを開く — 保存時にデバイスへ自動書き戻し（SQLite3 Editor等のカスタムエディタも対応）
-  - リネーム、ファイル/フォルダー新規作成、移動、コピー
-  - デバイス内ドラッグ&ドロップでファイル移動
-  - Shift/Ctrl+クリックで複数選択（一括削除・ダウンロード・移動・コピー）
-  - エクスプローラーで表示（Shift+Alt+R）、パスコピー（Shift+Alt+C）
-  - キャッシュ管理（ツールバーからクリア、デフォルト7日で自動削除）
-  - スペース・日本語ファイル名対応
-  - ビルド用セレクターとは独立したデバイス選択
-- **Feature Toggles** — 設定で各機能の表示ON/OFF。
-- **多言語対応** — 英語・日本語UI。
+![バリアントピッカー](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/variant.png)
+
+**複数デバイス同時実行**
+複数デバイスで同時にアプリを実行。デバイスごとに独立したログ出力。
+
+**フローティングツールバー**
+Flutterと同様のデバッグツールバーで停止・再起動。
+
+**F5対応**
+`launch.json` でF5キーからビルド＆実行。
+
+**コールドブート & 自動起動**
+エミュレーターを初期状態から再起動（コールドブート）。iOSシミュレーターは終了時に自動起動。
+
+**自動検出**
+SDK・JDK・プロジェクトルートを自動検出。
+
+## Device File Explorer
+
+サイドバーからAndroidデバイスのファイルを操作。
+
+![デバイスエクスプローラー](https://raw.githubusercontent.com/MAJITRUE/MobileRunner/main/images/device-explorer.png)
+
+**ファイルを開いて自動反映**
+ファイルをクリックして開く。保存するとデバイスに自動反映。テキスト、画像プレビュー、SQLite3 Editor等、VSCodeのエディタに対応。
+
+**ドラッグ&ドロップ**
+デバイス内でファイルを移動。ローカルからフォルダにドロップしてアップロード。
+
+**複数選択**
+Shift/Ctrl+クリックで一括削除・ダウンロード・移動・コピー・パスコピー。
+
+**アプリのプライベートデータ**
+デバッグ可能なアプリのdatabases、shared_prefs等にアクセス。
+
+**ショートカット**
+| 操作 | Windows | macOS |
+|------|---------|-------|
+| リネーム | F2 | Enter |
+| 削除 | Delete | Cmd+Backspace |
+| エクスプローラーで表示 | Shift+Alt+R | Cmd+Alt+R |
+| パスコピー | Shift+Alt+C | Cmd+Alt+C |
 
 ## 必要条件
 
-### Android
-- **Android SDK**（`adb` と `emulator`）
-- プロジェクトルートに **Gradle wrapper**（`gradlew` / `gradlew.bat`）
-- `build.gradle` または `build.gradle.kts` を含むAndroidプロジェクト
+**Android** — Android SDK（`adb`、`emulator`）、Gradle wrapper、`build.gradle` または `build.gradle.kts`
 
-### iOS（macOSのみ）
-- **Xcode**（Command Line Tools含む）
-- Xcodeプロジェクト（`.xcodeproj` または `.xcworkspace`）
+**iOS（macOSのみ）** — Xcode（Command Line Tools含む）、`.xcodeproj` または `.xcworkspace`
 
 ## クイックスタート
 
-1. VSCodeでAndroidプロジェクトフォルダーを開く
-2. ステータスバーに接続中のデバイスが表示される（または「No Device」）
-3. デバイス名をクリックしてデバイスを選択またはエミュレーターを起動
-4. **▶ Run** をクリックしてビルド＆実行
+1. VSCodeでプロジェクトフォルダーを開く
+2. ステータスバーのデバイス名をクリックしてデバイスを選択
+3. **▶ Run** をクリックしてビルド＆実行
 
 ## ライセンス
 

@@ -8,3 +8,7 @@ node_modules/**
 CLAUDE.md
 package-lock.json
 *.vsix
+images/statusbar.png
+images/device-picker.png
+images/device-explorer.png
+images/variant.png
