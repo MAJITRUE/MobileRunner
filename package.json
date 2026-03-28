@@ -256,25 +256,25 @@
         "command": "native-runner.fileExplorer.rename",
         "key": "f2",
         "mac": "enter",
-        "when": "focusedView == deviceFileExplorer && listFocus"
+        "when": "focusedView == deviceFileExplorer && native-runner.explorer.hasSelection"
       },
       {
         "command": "native-runner.fileExplorer.delete",
         "key": "delete",
         "mac": "cmd+backspace",
-        "when": "focusedView == deviceFileExplorer && listFocus"
+        "when": "focusedView == deviceFileExplorer && native-runner.explorer.hasSelection"
       },
       {
         "command": "native-runner.fileExplorer.revealInExplorer",
         "key": "shift+alt+r",
         "mac": "cmd+alt+r",
-        "when": "focusedView == deviceFileExplorer && listFocus && viewItem =~ /deviceFile/"
+        "when": "focusedView == deviceFileExplorer && native-runner.explorer.hasSelection"
       },
       {
         "command": "native-runner.fileExplorer.copyPath",
         "key": "shift+alt+c",
         "mac": "cmd+alt+c",
-        "when": "focusedView == deviceFileExplorer && listFocus"
+        "when": "focusedView == deviceFileExplorer && native-runner.explorer.hasSelection"
       }
     ],
     "debuggers": [

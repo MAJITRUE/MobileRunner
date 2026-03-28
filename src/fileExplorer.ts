@@ -118,6 +118,13 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     });
     this.disposables.push(this.treeView);
 
+    // Track selection state for keybindings (focusedView + hasSelection)
+    this.disposables.push(
+      this.treeView.onDidChangeSelection((e) => {
+        vscode.commands.executeCommand("setContext", "native-runner.explorer.hasSelection", e.selection.length > 0);
+      })
+    );
+
     // Clear cache when folder is collapsed — next expand will re-fetch from device
     this.disposables.push(
       this.treeView.onDidCollapseElement((e) => {
@@ -499,7 +506,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     return result === vscode.l10n.t("Continue");
   }
 
-  async renameItem(item: FileExplorerItem): Promise<void> {
+  async renameItem(item?: FileExplorerItem): Promise<void> {
+    item = this.getSelectedItem(item);
+    if (!item) { return; }
     if (!item?.data?.deviceId || !item?.data?.remotePath || !item.data.entry) { return; }
 
     const newName = await vscode.window.showInputBox({
@@ -775,7 +784,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
-  async revealInExplorer(item: FileExplorerItem): Promise<void> {
+  async revealInExplorer(item?: FileExplorerItem): Promise<void> {
+    item = this.getSelectedItem(item);
+    if (!item) { return; }
     if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
 
     // Check if this file has been opened/cached locally
@@ -915,6 +926,12 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     return candidate;
   }
 
+  /** Get a single selected item, falling back to treeView.selection for keybinding calls */
+  private getSelectedItem(item?: FileExplorerItem): FileExplorerItem | undefined {
+    if (item) { return item; }
+    return this.treeView.selection[0];
+  }
+
   private resolveItems(item: FileExplorerItem, items?: FileExplorerItem[]): FileExplorerItem[] {
     if (items && items.length > 0) {
       return items.filter((i) => i.data?.deviceId && i.data?.remotePath);
@@ -922,6 +939,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     if (item?.data?.deviceId && item?.data?.remotePath) {
       return [item];
     }
+    // Fallback: use treeView selection (for keybinding calls without arguments)
+    const selection = this.treeView.selection.filter((i) => i.data?.deviceId && i.data?.remotePath);
+    if (selection.length > 0) { return selection; }
     return [];
   }
 
