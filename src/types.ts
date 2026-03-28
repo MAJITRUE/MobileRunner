@@ -25,7 +25,9 @@ export function findProjectRootCommon(
   if (activeFilePath) {
     let dir = path.dirname(activeFilePath);
     while (dir !== path.dirname(dir)) {
-      if (matcher(dir)) { return dir; }
+      // Skip if any path component is in SKIP_DIRS (e.g. Pods/, node_modules/)
+      const dirName = path.basename(dir);
+      if (!SKIP_DIRS.has(dirName) && matcher(dir)) { return dir; }
       dir = path.dirname(dir);
     }
   }
