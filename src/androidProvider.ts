@@ -309,12 +309,31 @@ export class AndroidProvider implements PlatformProvider {
     return fs.existsSync(path.join(dir, "build.gradle")) || fs.existsSync(path.join(dir, "build.gradle.kts"));
   }
 
+  /**
+   * Check if a directory is part of a Flutter project (has pubspec.yaml at same level or parent).
+   * If Dart-Code extension is installed, skip Flutter projects to avoid conflicts.
+   */
+  private isFlutterProject(dir: string): boolean {
+    if (!vscode.extensions.getExtension("Dart-Code.dart-code")) {
+      return false; // No Dart extension — no conflict
+    }
+    // Check current dir and up to 2 parent levels for pubspec.yaml
+    let check = dir;
+    for (let i = 0; i < 3; i++) {
+      if (fs.existsSync(path.join(check, "pubspec.yaml"))) { return true; }
+      const parent = path.dirname(check);
+      if (parent === check) { break; }
+      check = parent;
+    }
+    return false;
+  }
+
   public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
     // Strategy 1: Walk up from active file
     if (activeFilePath) {
       let dir = path.dirname(activeFilePath);
       while (dir !== path.dirname(dir)) {
-        if (this.hasGradleProject(dir)) { return dir; }
+        if (this.hasGradleProject(dir) && !this.isFlutterProject(dir)) { return dir; }
         dir = path.dirname(dir);
       }
     }
@@ -322,14 +341,14 @@ export class AndroidProvider implements PlatformProvider {
     // Strategy 2: Scan workspace folders and one level of subdirectories
     for (const folder of workspaceFolders) {
       const root = folder.uri.fsPath;
-      if (this.hasGradleProject(root)) { return root; }
+      if (this.hasGradleProject(root) && !this.isFlutterProject(root)) { return root; }
 
       try {
         const entries = fs.readdirSync(root, { withFileTypes: true });
         for (const entry of entries) {
           if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
             const subDir = path.join(root, entry.name);
-            if (this.hasGradleProject(subDir)) { return subDir; }
+            if (this.hasGradleProject(subDir) && !this.isFlutterProject(subDir)) { return subDir; }
           }
         }
       } catch { /* ignore */ }
