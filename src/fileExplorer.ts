@@ -671,12 +671,30 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     );
     if (!confirm) { return; }
 
-    // Collect directories that have open files (skip these)
+    // Collect directories that have files open in editor tabs (skip these)
     const openDirs = new Set<string>();
+    // Check openedFiles (registered mappings)
     for (const [, info] of this.openedFiles) {
       const dir = path.dirname(info.localPath);
       const relative = path.relative(this.tmpRoot, dir).split(path.sep)[0];
       if (relative) { openDirs.add(relative); }
+    }
+    // Also check all visible editor tabs for files in our cache directory
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        const input = tab.input;
+        if (input && typeof input === "object" && "uri" in input) {
+          const uri = (input as { uri: vscode.Uri }).uri;
+          if (uri.scheme === "file") {
+            const filePath = uri.fsPath;
+            const relative = path.relative(this.tmpRoot, filePath);
+            if (relative && !relative.startsWith("..")) {
+              const topDir = relative.split(path.sep)[0];
+              if (topDir) { openDirs.add(topDir); }
+            }
+          }
+        }
+      }
     }
 
     // Delete cache subdirectories, skipping open file dirs
