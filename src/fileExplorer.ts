@@ -651,7 +651,8 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       prompt: mode === "move"
         ? vscode.l10n.t("Move to (remote path)")
         : vscode.l10n.t("Copy to (remote path)"),
-      value: path.posix.dirname(item.data.remotePath) + "/",
+      value: item.data.remotePath,
+      valueSelection: [path.posix.dirname(item.data.remotePath).length + 1, path.posix.dirname(item.data.remotePath).length + 1],
     });
     if (!dest) { return; }
 
