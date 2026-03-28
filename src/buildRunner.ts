@@ -67,6 +67,9 @@ export class BuildRunner implements vscode.Disposable {
       return;
     }
 
+    // Wait for variant scan to complete before building
+    await this.variantManager.waitForScan();
+
     const currentDev = this.deviceManager.getCurrentDevice();
     if (skipDebugSession && currentDev && this.sessions.has(currentDev.id)) {
       return;

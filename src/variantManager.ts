@@ -7,6 +7,7 @@ export class VariantManager implements vscode.Disposable {
   private cachedVariants: string[] | undefined;
   private selectedVariant: string | undefined;
   private scanning = false;
+  private scanPromise: Promise<string[]> | undefined;
   private outputChannel: vscode.LogOutputChannel | undefined;
   private disposables: vscode.Disposable[] = [];
 
@@ -121,8 +122,16 @@ export class VariantManager implements vscode.Disposable {
     return undefined;
   }
 
+  /** Wait for any in-progress scan to complete */
+  public async waitForScan(): Promise<void> {
+    if (this.scanPromise) { await this.scanPromise; }
+  }
+
   public async triggerScan(silent = false): Promise<string[]> {
-    if (this.scanning) { return this.cachedVariants || []; }
+    if (this.scanning) {
+      if (this.scanPromise) { return this.scanPromise; }
+      return this.cachedVariants || [];
+    }
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) { return []; }
@@ -143,29 +152,34 @@ export class VariantManager implements vscode.Disposable {
     this.scanning = true;
     this.statusBarItem.text = `$(loading~spin) ${this.getSelectedVariant() || "..."}`;
 
-    try {
-      let variants: string[];
-      if (silent) {
-        variants = await provider.scanVariants(projectRoot);
-      } else {
-        variants = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Scanning build variants...") },
-          () => provider.scanVariants(projectRoot)
-        );
+    this.scanPromise = (async () => {
+      try {
+        let variants: string[];
+        if (silent) {
+          variants = await provider!.scanVariants(projectRoot!);
+        } else {
+          variants = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Scanning build variants...") },
+            () => provider!.scanVariants(projectRoot!)
+          );
+        }
+        this.cachedVariants = variants;
+        if (variants.length > 0) {
+          this.outputChannel?.info(vscode.l10n.t("Found variants: {0}", variants.join(", ")));
+        }
+        this.updateStatusBar();
+        return variants;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.outputChannel?.warn(vscode.l10n.t("Failed to scan build variants: {0}", msg));
+        return [];
+      } finally {
+        this.scanning = false;
+        this.scanPromise = undefined;
       }
-      this.cachedVariants = variants;
-      if (variants.length > 0) {
-        this.outputChannel?.info(vscode.l10n.t("Found variants: {0}", variants.join(", ")));
-      }
-      this.updateStatusBar();
-      return variants;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.outputChannel?.warn(vscode.l10n.t("Failed to scan build variants: {0}", msg));
-      return [];
-    } finally {
-      this.scanning = false;
-    }
+    })();
+
+    return this.scanPromise;
   }
 
   private buildPickerItems(variants: string[], current: string): VariantPickItem[] {
