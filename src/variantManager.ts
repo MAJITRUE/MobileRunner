@@ -124,15 +124,21 @@ export class VariantManager implements vscode.Disposable {
   public async triggerScan(silent = false): Promise<string[]> {
     if (this.scanning) { return this.cachedVariants || []; }
 
-    const provider = this.getCurrentProvider();
-    if (!provider) { return []; }
-
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) { return []; }
 
     const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
-    const projectRoot = provider.findProjectRoot(workspaceFolders, activeFilePath);
-    if (!projectRoot) { return []; }
+
+    // Try current device's provider first, then fall back to all providers
+    let provider = this.getCurrentProvider();
+    let projectRoot = provider?.findProjectRoot(workspaceFolders, activeFilePath);
+    if (!projectRoot) {
+      for (const p of this.providers) {
+        projectRoot = p.findProjectRoot(workspaceFolders, activeFilePath);
+        if (projectRoot) { provider = p; break; }
+      }
+    }
+    if (!provider || !projectRoot) { return []; }
 
     this.scanning = true;
     this.statusBarItem.text = `$(loading~spin) ${this.getSelectedVariant() || "..."}`;

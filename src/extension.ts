@@ -132,9 +132,10 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Initial device refresh + variant scan
-  deviceManager.refreshDevices();
-  variantManager.triggerScan(true);
+  // Initial device refresh, then variant scan after devices are detected
+  deviceManager.refreshDevices().then(() => {
+    variantManager?.triggerScan(true);
+  });
 }
 
 class NativeDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
