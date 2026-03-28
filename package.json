@@ -184,12 +184,12 @@
       "view/title": [
         {
           "command": "native-runner.fileExplorer.clearCache",
-          "when": "view == deviceFileExplorer",
+          "when": "view == deviceFileExplorer && native-runner.hasAndroidDevice",
           "group": "navigation"
         },
         {
           "command": "native-runner.fileExplorer.refresh",
-          "when": "view == deviceFileExplorer",
+          "when": "view == deviceFileExplorer && native-runner.hasAndroidDevice",
           "group": "navigation"
         },
         {
