@@ -255,11 +255,13 @@
       {
         "command": "native-runner.fileExplorer.rename",
         "key": "f2",
+        "mac": "enter",
         "when": "focusedView == deviceFileExplorer && listFocus"
       },
       {
         "command": "native-runner.fileExplorer.delete",
         "key": "delete",
+        "mac": "cmd+backspace",
         "when": "focusedView == deviceFileExplorer && listFocus"
       },
       {
