@@ -209,7 +209,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     try {
       await this.service.pushFile(info.deviceId, info.localPath, info.remotePath, info.runAsPackage);
       vscode.window.setStatusBarMessage(vscode.l10n.t("Saved to device: {0}", path.posix.basename(info.remotePath)), 3000);
-      this.onDidChangeTreeDataEmitter.fire(undefined);
+      this.refreshTree();
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Failed to save to device: {0}", err?.message || String(err)));
     }
@@ -357,8 +357,19 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
   // --- Actions ---
 
   refresh(): void {
-    this.childrenCache.clear();
-    this.onDidChangeTreeDataEmitter.fire(undefined);
+    this.refreshTree();
+  }
+
+  private refreshTree(element?: FileExplorerItem): void {
+    if (element) {
+      // Clear cache for this element and its parent
+      this.childrenCache.delete(element.data.remotePath);
+      const parentPath = path.posix.dirname(element.data.remotePath);
+      this.childrenCache.delete(parentPath);
+    } else {
+      this.childrenCache.clear();
+    }
+    this.onDidChangeTreeDataEmitter.fire(element ?? undefined);
   }
 
   async downloadFile(item: FileExplorerItem, items?: FileExplorerItem[]): Promise<void> {
@@ -412,7 +423,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         }
       );
       vscode.window.showInformationMessage(vscode.l10n.t("Upload complete"));
-      this.onDidChangeTreeDataEmitter.fire(item);
+      this.refreshTree(item);
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Upload failed: {0}", err?.message || String(err)));
     }
@@ -437,7 +448,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         await this.service.deleteFile(t.data.deviceId, t.data.remotePath, runAs);
       }
       vscode.window.showInformationMessage(vscode.l10n.t("Deleted"));
-      this.onDidChangeTreeDataEmitter.fire(undefined);
+      this.refreshTree();
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Delete failed: {0}", err?.message || String(err)));
     }
@@ -456,7 +467,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const runAs = item.data.packageName || item.data.entry?.packageName;
     try {
       await this.service.makeDirectory(item.data.deviceId, remotePath, runAs);
-      this.onDidChangeTreeDataEmitter.fire(item);
+      this.refreshTree(item);
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Failed to create folder: {0}", err?.message || String(err)));
     }
@@ -492,7 +503,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const runAs = item.data.packageName || item.data.entry.packageName;
     try {
       await this.service.renameFile(item.data.deviceId, item.data.remotePath, newPath, runAs);
-      this.onDidChangeTreeDataEmitter.fire(undefined);
+      this.refreshTree();
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Rename failed: {0}", err?.message || String(err)));
     }
@@ -511,7 +522,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const runAs = item.data.packageName || item.data.entry?.packageName;
     try {
       await this.service.touchFile(item.data.deviceId, remotePath, runAs);
-      this.onDidChangeTreeDataEmitter.fire(item);
+      this.refreshTree(item);
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Failed to create file: {0}", err?.message || String(err)));
     }
@@ -604,7 +615,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
               }
             }
           );
-          this.onDidChangeTreeDataEmitter.fire(undefined); // refresh whole tree since source and target both changed
+          this.refreshTree(); // refresh whole tree since source and target both changed
         } catch (err: any) {
           vscode.window.showErrorMessage(vscode.l10n.t("Move failed: {0}", err?.message || String(err)));
         }
@@ -630,7 +641,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         }
       );
       vscode.window.showInformationMessage(vscode.l10n.t("Upload complete"));
-      this.onDidChangeTreeDataEmitter.fire(targetFolder);
+      this.refreshTree(targetFolder);
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Upload failed: {0}", err?.message || String(err)));
     }
@@ -696,7 +707,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
           await this.service.copyFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
         }
       }
-      this.onDidChangeTreeDataEmitter.fire(undefined);
+      this.refreshTree();
     } catch (err: any) {
       const msg = mode === "move"
         ? vscode.l10n.t("Move failed: {0}", err?.message || String(err))
