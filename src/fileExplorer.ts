@@ -512,13 +512,25 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       if (fs.existsSync(oldLocalPath)) {
         const newLocalPath = path.join(this.tmpRoot, oldHash, newName);
 
-        // Update watcher and mapping before rename
+        // Stop watcher before rename
         this.unwatchFile(oldKey);
 
-        // Use WorkspaceEdit to rename — VSCode updates open editors automatically
-        const edit = new vscode.WorkspaceEdit();
-        edit.renameFile(vscode.Uri.file(oldLocalPath), vscode.Uri.file(newLocalPath));
-        await vscode.workspace.applyEdit(edit);
+        // Close old editor tab first
+        const oldUri = vscode.Uri.file(oldLocalPath);
+        for (const tabGroup of vscode.window.tabGroups.all) {
+          for (const tab of tabGroup.tabs) {
+            const input = tab.input;
+            if (input && typeof input === "object" && "uri" in input) {
+              const uri = (input as { uri: vscode.Uri }).uri;
+              if (normalizeKey(uri.fsPath) === oldKey) {
+                await vscode.window.tabGroups.close(tab);
+              }
+            }
+          }
+        }
+
+        // Rename local cache file
+        fs.renameSync(oldLocalPath, newLocalPath);
 
         // Re-register watcher with new path
         const newInfo: OpenedFileInfo = {
@@ -530,6 +542,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         this.openedFiles.set(normalizeKey(newLocalPath), newInfo);
         this.watchFile(newLocalPath, newInfo);
         this.saveMappings();
+
+        // Open renamed file
+        await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(newLocalPath), { preserveFocus: true, preview: true });
       }
 
       this.refreshTree();
