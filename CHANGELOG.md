@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.5 (2026-03-29)
+
+- **Multi-project variant picker** — All projects in workspace shown with project name sections; select variant from any project
+- **Project search depth setting** — `projectSearchDepth` (default 2) for finding projects in nested directories
+- **Variant selection memory** — Remembers last selected variant per project across sessions (workspaceState)
+- **Status bar reordered** — Device → Variant → Run (left to right, matching workflow order)
+- **Variant scan improvements** — Scan delayed until device detection completes; Run waits for scan to finish
+- **iOS scheme filtering** — Query `.xcodeproj` instead of `.xcworkspace` to exclude Pods/Flutter dependency schemes
+- **iOS simulator auto-boot** — Automatically boots shutdown simulator before build
+- **Platform-filtered device list** — Only show devices for platforms with projects in workspace
+- **APK recursive search** — Find APKs in any directory depth (supports multi-dimension flavors)
+- **Skip dirs in upward search** — Pods/, node_modules/ etc. excluded from active-file project detection
+- Fixed: Disconnected iOS devices (devicectl `tunnelState: unavailable`) no longer shown as available
+- Fixed: devicectl JSON output via temp file (fixes `/dev/stdout` parse error on some macOS versions)
+- Fixed: Scanning indicator shows "Scanning..." instead of stale variant name
+- Fixed: TreeView keybindings work via `onDidChangeSelection` context (Secondary Explorer pattern)
+
 ## 0.5.4 (2026-03-28)
 
 - **Device Explorer: Cache Clear** — Toolbar button to clear local cache with size display; skips files open in editor
