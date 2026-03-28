@@ -118,11 +118,12 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     });
     this.disposables.push(this.treeView);
 
-    // Clear cache when folder is collapsed — next expand will re-fetch
+    // Clear cache when folder is collapsed — next expand will re-fetch from device
     this.disposables.push(
       this.treeView.onDidCollapseElement((e) => {
         if (e.element.data.remotePath) {
           this.childrenCache.delete(e.element.data.remotePath);
+          this.onDidChangeTreeDataEmitter.fire(e.element);
         }
       })
     );
