@@ -167,6 +167,11 @@
         "command": "native-runner.fileExplorer.copyTo",
         "title": "%command.fileExplorer.copyTo%",
         "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.revealInExplorer",
+        "title": "%command.fileExplorer.revealInExplorer%",
+        "category": "Native Runner"
       }
     ],
     "menus": {
@@ -227,6 +232,11 @@
           "command": "native-runner.fileExplorer.copyPath",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
           "group": "4_copy@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.revealInExplorer",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile/",
+          "group": "4_copy@2"
         },
         {
           "command": "native-runner.fileExplorer.delete",

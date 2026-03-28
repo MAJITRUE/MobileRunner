@@ -95,5 +95,6 @@
   "Move failed: {0}": "移動失敗: {0}",
   "Copy failed: {0}": "コピー失敗: {0}",
   "Move to (remote path)": "移動先（リモートパス）",
-  "Copy to (remote path)": "コピー先（リモートパス）"
+  "Copy to (remote path)": "コピー先（リモートパス）",
+  "File not cached. Open the file first, then use Reveal in Explorer.": "ファイルがキャッシュされていません。先にファイルを開いてから実行してください。"
 }
