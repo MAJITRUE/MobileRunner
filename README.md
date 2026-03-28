@@ -14,7 +14,7 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 
 - **One-Click Run** — Click `▶ Run` in the status bar to build, install, and launch your app.
 - **Multi-Device** — Run the app on multiple devices at the same time. Each device gets its own logcat Output Channel.
-- **Build Variant Selector** — Auto-scans Gradle build variants (`debug`, `release`, flavors). Click to switch.
+- **Build Variant Selector** — Shows all variants/schemes from all projects in workspace with project name sections. Remembers last selection per project.
 - **Emulator Cold Boot** — Restart an emulator from scratch without leaving VSCode.
 - **Logcat in Debug Console** — App logs streamed to the Debug Console, filtered by your app's PID.
 - **Floating Toolbar** — Stop and restart your app from the debug toolbar, just like Flutter.
@@ -55,20 +55,21 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 ## Status Bar
 
 ```
-[📱 Pixel 7] [▶ Run] [📦 debug]
+[📱 Pixel 7] [📦 debug] [▶ Run]
 ```
 
 | Item | Description |
 |------|-------------|
 | `📱 Pixel 7` | Selected device. Click to open device picker. |
+| `📦 debug` | Current build variant/scheme. Click to select from all projects. |
 | `▶ Run` | Build, install, and launch. Shows spinner during build. |
 | `⬜ Stop` | Stop the app on the selected device. Visible only while running. |
-| `📦 debug` | Current build variant. Click to change. |
 
 ## Extension Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `native-runner.projectSearchDepth` | `2` | Max subdirectory depth to search for Android/iOS projects. |
 | `native-runner.sdkPath` | `""` | Path to Android SDK. Auto-detected if empty. |
 | `native-runner.javaHome` | `""` | Path to JDK. Auto-detected if empty. |
 | `native-runner.appModule` | `"app"` | App module name (e.g., `app`, `mobile`, `wear`). |
@@ -135,7 +136,7 @@ VSCode から Android / iOS アプリをビルド・インストール・実行�
 
 - **ワンクリック実行** — ステータスバーの `▶ Run` でビルド・インストール・起動。
 - **マルチデバイス** — 複数デバイスで同時にアプリを実行。デバイスごとに独立したLogcat出力。
-- **ビルドバリアント選択** — Gradleビルドバリアント（`debug`、`release`、フレーバー）を自動スキャン。
+- **ビルドバリアント選択** — ワークスペース内の全プロジェクトのバリアント/スキームをプロジェクト名付きで表示。前回の選択を記憶。
 - **エミュレーターコールドブート** — VSCodeからエミュレーターを再起動。
 - **Debug ConsoleにLogcat** — PIDフィルター付きでアプリログをDebug Consoleに表示。
 - **フローティングツールバー** — Flutterと同様のデバッグツールバーで停止・再起動。
