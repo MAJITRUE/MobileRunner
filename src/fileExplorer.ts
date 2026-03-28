@@ -118,6 +118,15 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     });
     this.disposables.push(this.treeView);
 
+    // Clear cache when folder is collapsed — next expand will re-fetch
+    this.disposables.push(
+      this.treeView.onDidCollapseElement((e) => {
+        if (e.element.data.remotePath) {
+          this.childrenCache.delete(e.element.data.remotePath);
+        }
+      })
+    );
+
     // Auto-select first device; handle disconnection
     this.disposables.push(
       this.deviceManager.onDeviceChanged(() => {
@@ -309,13 +318,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     // Directory listing
     const remotePath = element.data.remotePath;
     const runAsPackage = element.data.packageName || element.data.entry?.packageName;
-    const refreshOnExpand = vscode.workspace.getConfiguration("native-runner").get<boolean>("explorerRefreshOnExpand", true);
-
-    // Return cache if available and refreshOnExpand is disabled
-    if (!refreshOnExpand) {
-      const cached = this.childrenCache.get(remotePath);
-      if (cached) { return cached; }
-    }
+    // Return cache if available (cache is cleared when folder is collapsed)
+    const cached = this.childrenCache.get(remotePath);
+    if (cached) { return cached; }
 
     const entries = await this.service.listDirectory(deviceId, remotePath, runAsPackage);
 
