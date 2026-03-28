@@ -1,6 +1,7 @@
 import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as vscode from "vscode";
 import { Device, Emulator, PlatformProvider, findProjectRootCommon } from "./types";
 
@@ -114,16 +115,25 @@ export class IosProvider implements PlatformProvider {
       return this.getPhysicalDevicesViaXctrace();
     }
     try {
-      const output = await this.exec("xcrun", [
+      const tmpFile = path.join(os.tmpdir(), "native-runner-devicectl.json");
+      await this.exec("xcrun", [
         "devicectl", "list", "devices",
-        "--json-output", "/dev/stdout",
+        "--json-output", tmpFile,
       ], 5000);
+      const output = fs.readFileSync(tmpFile, "utf-8");
       const json = JSON.parse(output);
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
       const devices: Device[] = [];
 
       for (const device of json.result?.devices || []) {
-        const connectionState = device.connectionProperties?.transportType;
-        const isConnected = connectionState === "wired" || connectionState === "wifi" || connectionState === "localNetwork";
+        // Skip non-physical devices (simulators have reality: "virtual")
+        if (device.hardwareProperties?.reality !== "physical") { continue; }
+
+        // Check connection: tunnelState "unavailable" means not connected
+        const tunnelState = device.connectionProperties?.tunnelState;
+        const transportType = device.connectionProperties?.transportType;
+        const isConnected = tunnelState !== "unavailable" &&
+          (transportType === "wired" || transportType === "wifi" || transportType === "localNetwork" || tunnelState === "connected");
         devices.push({
           id: device.hardwareProperties?.udid || device.identifier,
           name: device.deviceProperties?.name || "iOS Device",
