@@ -535,7 +535,7 @@ export class IosProvider implements PlatformProvider {
     if (activeFilePath) {
       let dir = path.dirname(activeFilePath);
       while (dir !== path.dirname(dir)) {
-        if (this.findXcodeProject(dir)) { return dir; }
+        if (this.findXcodeProject(dir) && !this.isFlutterProject(dir)) { return dir; }
         dir = path.dirname(dir);
       }
     }
@@ -543,19 +543,37 @@ export class IosProvider implements PlatformProvider {
     // Strategy 2: Scan workspace folders and one level of subdirectories
     for (const folder of workspaceFolders) {
       const root = folder.uri.fsPath;
-      if (this.findXcodeProject(root)) { return root; }
+      if (this.findXcodeProject(root) && !this.isFlutterProject(root)) { return root; }
 
       try {
         const entries = fs.readdirSync(root, { withFileTypes: true });
         for (const entry of entries) {
           if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
             const subDir = path.join(root, entry.name);
-            if (this.findXcodeProject(subDir)) { return subDir; }
+            if (this.findXcodeProject(subDir) && !this.isFlutterProject(subDir)) { return subDir; }
           }
         }
       } catch { /* ignore */ }
     }
     return undefined;
+  }
+
+  /**
+   * Check if a directory is part of a Flutter project.
+   * Skip if Dart-Code extension is installed and pubspec.yaml exists.
+   */
+  private isFlutterProject(dir: string): boolean {
+    if (!vscode.extensions.getExtension("Dart-Code.dart-code")) {
+      return false;
+    }
+    let check = dir;
+    for (let i = 0; i < 3; i++) {
+      if (fs.existsSync(path.join(check, "pubspec.yaml"))) { return true; }
+      const parent = path.dirname(check);
+      if (parent === check) { break; }
+      check = parent;
+    }
+    return false;
   }
 
   private findXcodeProject(dir: string): { path: string; type: "workspace" | "project" } | undefined {
