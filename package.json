@@ -2,7 +2,7 @@
   "name": "native-runner",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.5.6",
+  "version": "0.5.8",
   "publisher": "majitrue",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.8 (2026-03-29)
+
+- **README redesigned** — cleaner layout with bold title + description format, variant picker screenshot added
+- **Images moved to GitHub raw URL** — package size reduced from 272KB to 73KB
+- **Flutter-inspired** tagline added to README
+- **Scan status** — shows "Gradle sync..." / "Xcode sync..." instead of generic "Scanning..."
+- **Scan failure** — shows error icon + "Scan failed" in status bar; manual rescan shows alert with error details
+- **Pre-scan display** — shows "—" instead of stale "debug" before scan completes
+- **Product flavor support** — package name and launcher activity read from APK via aapt2 (handles applicationIdSuffix correctly)
+- Fixed: floating toolbar not appearing (resolveDebugConfiguration guard was blocking internal session creation)
+- Fixed: floating toolbar disappearing after restart (DAPセッション was not re-created)
+- Fixed: variant selection not restored for non-first projects
+
+## 0.5.7 (2026-03-29)
+
+- README redesigned: cleaner layout with Build & Run / Device File Explorer sections
+- Updated status bar screenshot
+- Fixed: variant selection not restored for non-first projects
+- Fixed: macOS keyboard shortcuts added to README
+
 ## 0.5.6 (2026-03-29)
 
 - README updates: status bar order, variant picker description, `projectSearchDepth` setting
