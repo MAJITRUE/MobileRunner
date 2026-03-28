@@ -11,14 +11,17 @@ export class VariantManager implements vscode.Disposable {
   private outputChannel: vscode.LogOutputChannel | undefined;
   private disposables: vscode.Disposable[] = [];
 
+  private lastProjectRoot: string | undefined;
+
   constructor(
     private providers: PlatformProvider[],
-    private deviceManager: DeviceManager
+    private deviceManager: DeviceManager,
+    private workspaceState: vscode.Memento
   ) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       "androidRunnerVariant",
       vscode.StatusBarAlignment.Right,
-      97
+      99
     );
     this.statusBarItem.name = "Build Variant";
     this.statusBarItem.command = "native-runner.selectVariant";
@@ -115,6 +118,9 @@ export class VariantManager implements vscode.Disposable {
 
     if (selection.variant) {
       this.selectedVariant = selection.variant;
+      if (this.lastProjectRoot) {
+        this.workspaceState.update(`variant:${this.lastProjectRoot}`, selection.variant);
+      }
       this.updateStatusBar();
       return selection.variant;
     }
@@ -164,11 +170,15 @@ export class VariantManager implements vscode.Disposable {
           );
         }
         this.cachedVariants = variants;
+        this.lastProjectRoot = projectRoot!;
         if (variants.length > 0) {
           this.outputChannel?.info(vscode.l10n.t("Found variants: {0}", variants.join(", ")));
-          // Auto-select first variant if current selection is not in the list
+          // Restore previous selection for this project, or auto-select first
+          const saved = this.workspaceState.get<string>(`variant:${projectRoot}`);
           const current = this.getSelectedVariant();
-          if (!variants.includes(current)) {
+          if (saved && variants.includes(saved)) {
+            this.selectedVariant = saved;
+          } else if (!variants.includes(current)) {
             this.selectedVariant = variants[0];
           }
         }

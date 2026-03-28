@@ -26,7 +26,7 @@ export class BuildRunner implements vscode.Disposable {
     this.disposables.push(this.outputChannel);
 
     // Run button
-    this.runStatusBarItem = vscode.window.createStatusBarItem("androidRunnerRun", vscode.StatusBarAlignment.Right, 99);
+    this.runStatusBarItem = vscode.window.createStatusBarItem("androidRunnerRun", vscode.StatusBarAlignment.Right, 98);
     this.runStatusBarItem.name = "Run";
     this.runStatusBarItem.text = `$(play) ${vscode.l10n.t("Run")}`;
     this.runStatusBarItem.tooltip = vscode.l10n.t("Build and run app");
@@ -35,13 +35,13 @@ export class BuildRunner implements vscode.Disposable {
     this.disposables.push(this.runStatusBarItem);
 
     // Building indicator
-    this.buildingStatusBarItem = vscode.window.createStatusBarItem("androidRunnerBuilding", vscode.StatusBarAlignment.Right, 99);
+    this.buildingStatusBarItem = vscode.window.createStatusBarItem("androidRunnerBuilding", vscode.StatusBarAlignment.Right, 98);
     this.buildingStatusBarItem.name = "Building";
     this.buildingStatusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Building...")}`;
     this.disposables.push(this.buildingStatusBarItem);
 
     // Stop button
-    this.stopStatusBarItem = vscode.window.createStatusBarItem("androidRunnerStop", vscode.StatusBarAlignment.Right, 98);
+    this.stopStatusBarItem = vscode.window.createStatusBarItem("androidRunnerStop", vscode.StatusBarAlignment.Right, 97);
     this.stopStatusBarItem.name = "Stop";
     this.stopStatusBarItem.text = `$(debug-stop) ${vscode.l10n.t("Stop")}`;
     this.stopStatusBarItem.tooltip = vscode.l10n.t("Stop running app");

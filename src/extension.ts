@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   deviceManager = new DeviceManager(providers);
-  variantManager = new VariantManager(providers, deviceManager);
+  variantManager = new VariantManager(providers, deviceManager, context.workspaceState);
   buildRunner = new BuildRunner(providers, deviceManager, variantManager);
   variantManager.setOutputChannel(buildRunner.outputChannel);
 
