@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.9 (2026-03-29)
+
+- Reduced package size
+
 ## 0.5.8 (2026-03-29)
 
 - **README redesigned** — cleaner layout with bold title + description format, variant picker screenshot added
