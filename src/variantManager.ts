@@ -215,6 +215,7 @@ export class VariantManager implements vscode.Disposable {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         this.outputChannel?.warn(vscode.l10n.t("Failed to scan build variants: {0}", msg));
+        this.statusBarItem.text = `$(error) ${vscode.l10n.t("Scan failed")}`;
         return [];
       } finally {
         this.scanning = false;
