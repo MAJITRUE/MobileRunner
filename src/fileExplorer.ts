@@ -809,18 +809,33 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
    * Close editor tab and clean up local cache for a remote file
    */
   private async closeAndCleanupCachedFile(deviceId: string, remotePath: string, fileName?: string): Promise<void> {
-    const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
-    const name = fileName || path.posix.basename(remotePath);
-    const localPath = path.join(this.tmpRoot, hash, name);
-    const key = normalizeKey(localPath);
+    // Find local path from openedFiles (handles renamed files correctly)
+    let localPath: string | undefined;
+    let key: string | undefined;
+    for (const [k, info] of this.openedFiles) {
+      if (info.deviceId === deviceId && info.remotePath === remotePath) {
+        localPath = info.localPath;
+        key = k;
+        break;
+      }
+    }
+
+    // Fallback: compute from hash (file may not be in openedFiles)
+    if (!localPath) {
+      const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
+      const name = fileName || path.posix.basename(remotePath);
+      localPath = path.join(this.tmpRoot, hash, name);
+      key = normalizeKey(localPath);
+    }
 
     // Close editor tab if open
+    const normalizedLocal = normalizeKey(localPath);
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         const input = tab.input;
         if (input && typeof input === "object" && "uri" in input) {
           const uri = (input as { uri: vscode.Uri }).uri;
-          if (normalizeKey(uri.fsPath) === key) {
+          if (normalizeKey(uri.fsPath) === normalizedLocal) {
             await vscode.window.tabGroups.close(tab);
           }
         }
@@ -828,7 +843,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
 
     // Stop watcher and remove mapping
-    this.unwatchFile(key);
+    if (key) { this.unwatchFile(key); }
 
     // Delete local cache
     if (fs.existsSync(localPath)) {
