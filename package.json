@@ -200,9 +200,9 @@
       ],
       "view/item/context": [
         {
-          "command": "native-runner.fileExplorer.openInEditor",
-          "when": "view == deviceFileExplorer && viewItem == deviceFile",
-          "group": "1_open@1"
+          "command": "native-runner.fileExplorer.revealInExplorer",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile/",
+          "group": "1_reveal@1"
         },
         {
           "command": "native-runner.fileExplorer.download",
@@ -228,11 +228,6 @@
           "command": "native-runner.fileExplorer.copyPath",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
           "group": "4_copy@1"
-        },
-        {
-          "command": "native-runner.fileExplorer.revealInExplorer",
-          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile/",
-          "group": "4_copy@2"
         },
         {
           "command": "native-runner.fileExplorer.newFolder",
