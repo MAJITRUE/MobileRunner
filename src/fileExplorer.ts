@@ -686,15 +686,8 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     );
     if (!confirm) { return; }
 
-    // Collect directories that have files open in editor tabs (skip these)
+    // Collect directories that have files actually open in editor tabs (skip these)
     const openDirs = new Set<string>();
-    // Check openedFiles (registered mappings)
-    for (const [, info] of this.openedFiles) {
-      const dir = path.dirname(info.localPath);
-      const relative = path.relative(this.tmpRoot, dir).split(path.sep)[0];
-      if (relative) { openDirs.add(relative); }
-    }
-    // Also check all visible editor tabs for files in our cache directory
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
         const input = tab.input;
@@ -710,6 +703,19 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
           }
         }
       }
+    }
+
+    // Stop watchers for files that will be deleted (not in open tabs)
+    const keysToRemove: string[] = [];
+    for (const [key, info] of this.openedFiles) {
+      const dir = path.dirname(info.localPath);
+      const relative = path.relative(this.tmpRoot, dir).split(path.sep)[0];
+      if (relative && !openDirs.has(relative)) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      this.unwatchFile(key);
     }
 
     // Delete cache subdirectories, skipping open file dirs
