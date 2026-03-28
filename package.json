@@ -269,6 +269,12 @@
         "key": "shift+alt+r",
         "mac": "cmd+alt+r",
         "when": "focusedView == deviceFileExplorer && listFocus"
+      },
+      {
+        "command": "native-runner.fileExplorer.copyPath",
+        "key": "ctrl+k ctrl+c",
+        "mac": "cmd+k cmd+c",
+        "when": "focusedView == deviceFileExplorer && listFocus"
       }
     ],
     "debuggers": [
