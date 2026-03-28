@@ -104,5 +104,6 @@
   "{0} folder \"{1}\" and all its contents?": "フォルダ「{1}」とその中身をすべて{0}しますか？",
   "Move": "移動",
   "Copy": "コピー",
-  "Move folder \"{0}\" and all its contents?": "フォルダ「{0}」とその中身をすべて移動しますか？"
+  "Move folder \"{0}\" and all its contents?": "フォルダ「{0}」とその中身をすべて移動しますか？",
+  "{0} items": "{0} 個のアイテム"
 }

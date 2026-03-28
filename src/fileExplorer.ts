@@ -114,6 +114,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       treeDataProvider: this,
       showCollapseAll: true,
       dragAndDropController: this,
+      canSelectMany: true,
     });
     this.disposables.push(this.treeView);
 
@@ -354,9 +355,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
-  async downloadFile(item: FileExplorerItem): Promise<void> {
-    if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
-    if (!await this.confirmLargeFile(item)) { return; }
+  async downloadFile(item: FileExplorerItem, items?: FileExplorerItem[]): Promise<void> {
+    const targets = this.resolveItems(item, items);
+    if (targets.length === 0) { return; }
 
     const targetDir = await vscode.window.showOpenDialog({
       canSelectFolders: true,
@@ -366,12 +367,15 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     });
     if (!targetDir?.[0]) { return; }
 
-    const runAs = item.data.packageName || item.data.entry?.packageName;
     try {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Downloading...") },
         async () => {
-          await this.service.pullFile(item.data.deviceId, item.data.remotePath, targetDir[0].fsPath, runAs);
+          for (const t of targets) {
+            const runAs = t.data.packageName || t.data.entry?.packageName;
+            const localDest = path.join(targetDir[0].fsPath, path.posix.basename(t.data.remotePath));
+            await this.service.pullFile(t.data.deviceId, t.data.remotePath, localDest, runAs);
+          }
         }
       );
       vscode.window.showInformationMessage(vscode.l10n.t("Download complete"));
@@ -408,20 +412,24 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
-  async deleteItem(item: FileExplorerItem): Promise<void> {
-    if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
+  async deleteItem(item: FileExplorerItem, items?: FileExplorerItem[]): Promise<void> {
+    const targets = this.resolveItems(item, items);
+    if (targets.length === 0) { return; }
 
-    const name = item.data.entry?.name || path.posix.basename(item.data.remotePath);
+    const names = targets.map((t) => t.data.entry?.name || path.posix.basename(t.data.remotePath));
+    const label = targets.length === 1 ? names[0] : vscode.l10n.t("{0} items", targets.length);
     const confirm = await vscode.window.showWarningMessage(
-      vscode.l10n.t("Delete {0}?", name),
+      vscode.l10n.t("Delete {0}?", label),
       { modal: true },
       vscode.l10n.t("Delete"),
     );
     if (!confirm) { return; }
 
-    const runAs = item.data.packageName || item.data.entry?.packageName;
     try {
-      await this.service.deleteFile(item.data.deviceId, item.data.remotePath, runAs);
+      for (const t of targets) {
+        const runAs = t.data.packageName || t.data.entry?.packageName;
+        await this.service.deleteFile(t.data.deviceId, t.data.remotePath, runAs);
+      }
       vscode.window.showInformationMessage(vscode.l10n.t("Deleted"));
       this.onDidChangeTreeDataEmitter.fire(undefined);
     } catch (err: any) {
@@ -503,9 +511,11 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
-  copyPath(item: FileExplorerItem): void {
-    if (!item?.data?.remotePath) { return; }
-    vscode.env.clipboard.writeText(item.data.remotePath);
+  copyPath(item: FileExplorerItem, items?: FileExplorerItem[]): void {
+    const targets = this.resolveItems(item, items);
+    if (targets.length === 0) { return; }
+    const paths = targets.map((t) => t.data.remotePath).join("\n");
+    vscode.env.clipboard.writeText(paths);
   }
 
   async openInEditor(item: FileExplorerItem): Promise<void> {
@@ -634,37 +644,45 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     return result === action;
   }
 
-  async moveToFolder(item: FileExplorerItem): Promise<void> {
-    await this.transferToFolder(item, "move");
+  async moveToFolder(item: FileExplorerItem, items?: FileExplorerItem[]): Promise<void> {
+    await this.transferToFolder(item, "move", items);
   }
 
-  async copyToFolder(item: FileExplorerItem): Promise<void> {
-    await this.transferToFolder(item, "copy");
+  async copyToFolder(item: FileExplorerItem, items?: FileExplorerItem[]): Promise<void> {
+    await this.transferToFolder(item, "copy", items);
   }
 
-  private async transferToFolder(item: FileExplorerItem, mode: "move" | "copy"): Promise<void> {
-    if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
-    const deviceId = item.data.deviceId;
-    const runAs = item.data.packageName || item.data.entry?.packageName;
+  private async transferToFolder(item: FileExplorerItem, mode: "move" | "copy", items?: FileExplorerItem[]): Promise<void> {
+    const targets = this.resolveItems(item, items);
+    if (targets.length === 0) { return; }
+
+    const isSingle = targets.length === 1;
+    const firstItem = targets[0];
 
     const dest = await vscode.window.showInputBox({
       prompt: mode === "move"
         ? vscode.l10n.t("Move to (remote path)")
         : vscode.l10n.t("Copy to (remote path)"),
-      value: item.data.remotePath,
-      valueSelection: [path.posix.dirname(item.data.remotePath).length + 1, path.posix.dirname(item.data.remotePath).length + 1],
+      value: isSingle
+        ? firstItem.data.remotePath
+        : path.posix.dirname(firstItem.data.remotePath) + "/",
+      valueSelection: isSingle
+        ? [path.posix.dirname(firstItem.data.remotePath).length + 1, path.posix.dirname(firstItem.data.remotePath).length + 1]
+        : undefined,
     });
     if (!dest) { return; }
 
-    const destPath = dest.endsWith("/")
-      ? dest + path.posix.basename(item.data.remotePath)
-      : dest;
-
     try {
-      if (mode === "move") {
-        await this.service.moveFile(deviceId, item.data.remotePath, destPath, runAs);
-      } else {
-        await this.service.copyFile(deviceId, item.data.remotePath, destPath, runAs);
+      for (const t of targets) {
+        const destPath = isSingle && !dest.endsWith("/")
+          ? dest
+          : (dest.endsWith("/") ? dest : dest + "/") + path.posix.basename(t.data.remotePath);
+        const runAs = t.data.packageName || t.data.entry?.packageName;
+        if (mode === "move") {
+          await this.service.moveFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
+        } else {
+          await this.service.copyFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
+        }
       }
       this.onDidChangeTreeDataEmitter.fire(undefined);
     } catch (err: any) {
@@ -701,6 +719,16 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       }
     }
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(localPath));
+  }
+
+  private resolveItems(item: FileExplorerItem, items?: FileExplorerItem[]): FileExplorerItem[] {
+    if (items && items.length > 0) {
+      return items.filter((i) => i.data?.deviceId && i.data?.remotePath);
+    }
+    if (item?.data?.deviceId && item?.data?.remotePath) {
+      return [item];
+    }
+    return [];
   }
 
   private cleanExpiredCache(): void {
