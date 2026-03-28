@@ -64,6 +64,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.debug.registerDebugConfigurationProvider("native-runner", {
       resolveDebugConfiguration(_folder, config): vscode.DebugConfiguration | undefined {
         (config as any).__uniqueId = `session-${Math.random().toString(16).slice(2, 10)}`;
+        // Allow if buildRunner is creating the session internally
+        if (buildRunner?.isStartingDebugSession()) { return config; }
         if (buildRunner?.getIsBuildInProgress()) { return undefined; }
         const currentDevice = deviceManager?.getCurrentDevice();
         if (currentDevice && buildRunner?.hasSessionForDevice(currentDevice.id)) { return undefined; }

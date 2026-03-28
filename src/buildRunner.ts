@@ -14,6 +14,11 @@ export class BuildRunner implements vscode.Disposable {
   private stopStatusBarItem: vscode.StatusBarItem;
   private isBuildInProgress = false;
   private logFilter: string | undefined;
+  private _startingDebugSession = false;
+
+  public isStartingDebugSession(): boolean {
+    return this._startingDebugSession;
+  }
   private disposables: vscode.Disposable[] = [];
   private buildCancelled = false;
 
@@ -247,11 +252,16 @@ export class BuildRunner implements vscode.Disposable {
 
   private async startDebugSession(deviceName: string, platform: string): Promise<void> {
     const platformLabel = platform === "ios" ? "iOS" : "Android";
-    await vscode.debug.startDebugging(undefined, {
-      type: "native-runner",
-      name: `${platformLabel}: ${deviceName}`,
-      request: "launch",
-    });
+    this._startingDebugSession = true;
+    try {
+      await vscode.debug.startDebugging(undefined, {
+        type: "native-runner",
+        name: `${platformLabel}: ${deviceName}`,
+        request: "launch",
+      });
+    } finally {
+      this._startingDebugSession = false;
+    }
   }
 
   public async restart(): Promise<void> {
