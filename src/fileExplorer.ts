@@ -546,7 +546,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       this.openedFiles.set(normalizeKey(localPath), info);
       this.watchFile(localPath, info);
       this.saveMappings();
-      await vscode.window.showTextDocument(vscode.Uri.file(localPath), { preserveFocus: true, preview: true });
+      await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(localPath), { preserveFocus: true, preview: true });
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Failed to open file: {0}", err?.message || String(err)));
     }
