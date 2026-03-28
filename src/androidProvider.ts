@@ -393,15 +393,21 @@ export class AndroidProvider implements PlatformProvider {
       throw new Error(vscode.l10n.t("Could not determine package name"));
     }
 
+    // Get launcher activity from aapt2 (most reliable) or fallback to manifest
     let launcherActivity: string | undefined;
-    if (fs.existsSync(manifestPath)) {
+    if (artifactPath) {
+      launcherActivity = await this.readLauncherActivityFromApk(artifactPath);
+    }
+    if (!launcherActivity && fs.existsSync(manifestPath)) {
       const content = fs.readFileSync(manifestPath, "utf-8");
+      const manifestPkg = content.match(/package\s*=\s*"([^"]+)"/)?.[1];
       const activityPattern = /<activity[^>]*android:name\s*=\s*"([^"]+)"[^>]*>[\s\S]*?<category\s+android:name\s*=\s*"android\.intent\.category\.LAUNCHER"/g;
       const actMatch = activityPattern.exec(content);
       if (actMatch) {
         launcherActivity = actMatch[1];
         if (launcherActivity.startsWith(".")) {
-          launcherActivity = packageName + launcherActivity;
+          // Use manifest package (namespace), NOT applicationId (which may have suffix)
+          launcherActivity = (manifestPkg || packageName) + launcherActivity;
         }
       }
     }
@@ -506,6 +512,23 @@ export class AndroidProvider implements PlatformProvider {
     try {
       const output = await this.exec(aapt2, ["dump", "badging", apkPath], 15000);
       const match = output.match(/package:\s+name='([^']+)'/);
+      return match ? match[1] : undefined;
+    } catch { return undefined; }
+  }
+
+  private async readLauncherActivityFromApk(apkPath: string): Promise<string | undefined> {
+    if (!this.sdkPath) { return undefined; }
+    const buildToolsDir = path.join(this.sdkPath, "build-tools");
+    if (!fs.existsSync(buildToolsDir)) { return undefined; }
+    const versions = fs.readdirSync(buildToolsDir).sort().reverse();
+    if (versions.length === 0) { return undefined; }
+    const exe = process.platform === "win32" ? "aapt2.exe" : "aapt2";
+    const aapt2 = path.join(buildToolsDir, versions[0], exe);
+    if (!fs.existsSync(aapt2)) { return undefined; }
+
+    try {
+      const output = await this.exec(aapt2, ["dump", "badging", apkPath], 15000);
+      const match = output.match(/launchable-activity:\s+name='([^']+)'/);
       return match ? match[1] : undefined;
     } catch { return undefined; }
   }
