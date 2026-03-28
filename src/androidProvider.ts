@@ -245,6 +245,22 @@ export class AndroidProvider implements PlatformProvider {
     await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", oldPath, newPath]);
   }
 
+  public async moveFile(deviceId: string, srcPath: string, destPath: string): Promise<void> {
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "mv", srcPath, destPath]);
+  }
+
+  public async runAsMoveFile(deviceId: string, packageName: string, srcPath: string, destPath: string): Promise<void> {
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "mv", srcPath, destPath]);
+  }
+
+  public async copyFile(deviceId: string, srcPath: string, destPath: string): Promise<void> {
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "cp", "-r", srcPath, destPath]);
+  }
+
+  public async runAsCopyFile(deviceId: string, packageName: string, srcPath: string, destPath: string): Promise<void> {
+    await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "run-as", packageName, "cp", "-r", srcPath, destPath]);
+  }
+
   public async touchFile(deviceId: string, remotePath: string): Promise<void> {
     await this.exec(this.getAdbPath(), ["-s", deviceId, "shell", "touch", remotePath]);
   }

@@ -31,5 +31,7 @@
   "config.showBuildControls.description": "ステータスバーにビルド/実行/停止コントロールを表示します。",
   "config.showVariantSelector.description": "ステータスバーにビルドバリアント選択を表示します。",
   "config.explorerFileSizeLimit.description": "デバイスエクスプローラーでファイルを開く/ダウンロード時の警告サイズ（MB）。0で無効。",
+  "command.fileExplorer.moveTo": "移動先...",
+  "command.fileExplorer.copyTo": "コピー先...",
   "config.explorerCacheDays.description": "デバイスエクスプローラーのキャッシュ保持日数。0でキャッシュ無効。"
 }

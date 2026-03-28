@@ -157,6 +157,16 @@
         "title": "%command.fileExplorer.selectDevice%",
         "category": "Native Runner",
         "icon": "$(device-mobile)"
+      },
+      {
+        "command": "native-runner.fileExplorer.moveTo",
+        "title": "%command.fileExplorer.moveTo%",
+        "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.copyTo",
+        "title": "%command.fileExplorer.copyTo%",
+        "category": "Native Runner"
       }
     ],
     "menus": {
@@ -202,6 +212,16 @@
           "command": "native-runner.fileExplorer.rename",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
           "group": "3_edit@3"
+        },
+        {
+          "command": "native-runner.fileExplorer.moveTo",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "3_edit@4"
+        },
+        {
+          "command": "native-runner.fileExplorer.copyTo",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "3_edit@5"
         },
         {
           "command": "native-runner.fileExplorer.copyPath",

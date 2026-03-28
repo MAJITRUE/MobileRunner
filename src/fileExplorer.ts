@@ -90,8 +90,8 @@ class FileExplorerItem extends vscode.TreeItem {
 // --- TreeDataProvider ---
 
 export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerItem>, vscode.TreeDragAndDropController<FileExplorerItem>, vscode.Disposable {
-  readonly dropMimeTypes = ["text/uri-list"];
-  readonly dragMimeTypes: string[] = [];
+  readonly dropMimeTypes = ["text/uri-list", "application/vnd.native-runner.file-explorer"];
+  readonly dragMimeTypes = ["application/vnd.native-runner.file-explorer"];
 
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<FileExplorerItem | undefined>();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
@@ -512,6 +512,15 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
+  handleDrag(source: readonly FileExplorerItem[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void {
+    const paths = source
+      .filter((s) => s.data.type === "file" || s.data.type === "folder")
+      .map((s) => JSON.stringify({ remotePath: s.data.remotePath, packageName: s.data.packageName || s.data.entry?.packageName, deviceId: s.data.deviceId }));
+    if (paths.length > 0) {
+      dataTransfer.set("application/vnd.native-runner.file-explorer", new vscode.DataTransferItem(paths.join("\n")));
+    }
+  }
+
   async handleDrop(target: FileExplorerItem | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): Promise<void> {
     if (!target?.data?.deviceId) { return; }
 
@@ -520,7 +529,31 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const targetFolder = isFolder ? target : undefined;
     if (!targetFolder?.data?.remotePath) { return; }
 
-    // Extract dropped URIs
+    // Internal tree drag: move files within device
+    const internalData = dataTransfer.get("application/vnd.native-runner.file-explorer");
+    if (internalData) {
+      const raw = await internalData.asString();
+      const items = raw.split("\n").filter(Boolean).map((s) => JSON.parse(s) as { remotePath: string; packageName?: string; deviceId: string });
+      if (items.length > 0 && items[0].deviceId === targetFolder.data.deviceId) {
+        try {
+          await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Moving...") },
+            async () => {
+              for (const item of items) {
+                const destPath = targetFolder.data.remotePath + "/" + path.posix.basename(item.remotePath);
+                await this.service.moveFile(item.deviceId, item.remotePath, destPath, runAs);
+              }
+            }
+          );
+          this.onDidChangeTreeDataEmitter.fire(undefined); // refresh whole tree since source and target both changed
+        } catch (err: any) {
+          vscode.window.showErrorMessage(vscode.l10n.t("Move failed: {0}", err?.message || String(err)));
+        }
+        return;
+      }
+    }
+
+    // External drag: upload files from local filesystem
     const uriList = dataTransfer.get("text/uri-list");
     if (!uriList) { return; }
     const raw = await uriList.asString();
@@ -542,6 +575,46 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       this.onDidChangeTreeDataEmitter.fire(targetFolder);
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Upload failed: {0}", err?.message || String(err)));
+    }
+  }
+
+  async moveToFolder(item: FileExplorerItem): Promise<void> {
+    await this.transferToFolder(item, "move");
+  }
+
+  async copyToFolder(item: FileExplorerItem): Promise<void> {
+    await this.transferToFolder(item, "copy");
+  }
+
+  private async transferToFolder(item: FileExplorerItem, mode: "move" | "copy"): Promise<void> {
+    if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
+    const deviceId = item.data.deviceId;
+    const runAs = item.data.packageName || item.data.entry?.packageName;
+
+    const dest = await vscode.window.showInputBox({
+      prompt: mode === "move"
+        ? vscode.l10n.t("Move to (remote path)")
+        : vscode.l10n.t("Copy to (remote path)"),
+      value: path.posix.dirname(item.data.remotePath) + "/",
+    });
+    if (!dest) { return; }
+
+    const destPath = dest.endsWith("/")
+      ? dest + path.posix.basename(item.data.remotePath)
+      : dest;
+
+    try {
+      if (mode === "move") {
+        await this.service.moveFile(deviceId, item.data.remotePath, destPath, runAs);
+      } else {
+        await this.service.copyFile(deviceId, item.data.remotePath, destPath, runAs);
+      }
+      this.onDidChangeTreeDataEmitter.fire(undefined);
+    } catch (err: any) {
+      const msg = mode === "move"
+        ? vscode.l10n.t("Move failed: {0}", err?.message || String(err))
+        : vscode.l10n.t("Copy failed: {0}", err?.message || String(err));
+      vscode.window.showErrorMessage(msg);
     }
   }
 

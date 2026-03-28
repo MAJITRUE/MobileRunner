@@ -90,5 +90,10 @@
   "New folder name": "新しいフォルダー名",
   "Failed to create folder: {0}": "フォルダー作成失敗: {0}",
   "Opening...": "開いています...",
-  "Failed to open file: {0}": "ファイルを開けませんでした: {0}"
+  "Failed to open file: {0}": "ファイルを開けませんでした: {0}",
+  "Moving...": "移動中...",
+  "Move failed: {0}": "移動失敗: {0}",
+  "Copy failed: {0}": "コピー失敗: {0}",
+  "Move to (remote path)": "移動先（リモートパス）",
+  "Copy to (remote path)": "コピー先（リモートパス）"
 }

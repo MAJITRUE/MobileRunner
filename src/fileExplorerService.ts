@@ -86,6 +86,22 @@ export class FileExplorerService {
     }
   }
 
+  async moveFile(deviceId: string, srcPath: string, destPath: string, runAsPackage?: string): Promise<void> {
+    if (runAsPackage) {
+      await this.provider.runAsMoveFile(deviceId, runAsPackage, srcPath, destPath);
+    } else {
+      await this.provider.moveFile(deviceId, srcPath, destPath);
+    }
+  }
+
+  async copyFile(deviceId: string, srcPath: string, destPath: string, runAsPackage?: string): Promise<void> {
+    if (runAsPackage) {
+      await this.provider.runAsCopyFile(deviceId, runAsPackage, srcPath, destPath);
+    } else {
+      await this.provider.copyFile(deviceId, srcPath, destPath);
+    }
+  }
+
   async touchFile(deviceId: string, remotePath: string, runAsPackage?: string): Promise<void> {
     if (runAsPackage) {
       await this.provider.runAsTouchFile(deviceId, runAsPackage, remotePath);

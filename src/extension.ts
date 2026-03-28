@@ -97,6 +97,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("native-runner.fileExplorer.newFolder", (item) => { fileExplorer.newFolder(item); }),
     vscode.commands.registerCommand("native-runner.fileExplorer.newFile", (item) => { fileExplorer.newFile(item); }),
     vscode.commands.registerCommand("native-runner.fileExplorer.rename", (item) => { fileExplorer.renameItem(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.moveTo", (item) => { fileExplorer.moveToFolder(item); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.copyTo", (item) => { fileExplorer.copyToFolder(item); }),
   );
 
   // Internal: called from debug adapter launch handler (F5)
