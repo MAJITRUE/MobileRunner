@@ -60,6 +60,8 @@ export class VariantManager implements vscode.Disposable {
 
   public getSelectedVariant(): string {
     if (this.selectedVariant) { return this.selectedVariant; }
+    // Don't return default "debug" before scan completes — show "—" instead
+    if (!this.cachedProjects) { return ""; }
     const config = vscode.workspace.getConfiguration("native-runner");
     const device = this.deviceManager.getCurrentDevice();
     if (device?.platform === "ios") {
