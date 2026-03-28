@@ -447,8 +447,12 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         const runAs = t.data.packageName || t.data.entry?.packageName;
         await this.service.deleteFile(t.data.deviceId, t.data.remotePath, runAs);
 
-        // Close editor tab and clean up cache for deleted file
-        await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
+        // Close editor tabs and clean up cache for deleted file/folder
+        if (t.data.type === "folder") {
+          await this.closeAndCleanupCachedFolder(t.data.deviceId, t.data.remotePath);
+        } else {
+          await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
+        }
       }
       vscode.window.showInformationMessage(vscode.l10n.t("Deleted"));
       this.refreshTree();
@@ -519,7 +523,6 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         this.unwatchFile(oldKey);
 
         // Close old editor tab first
-        const oldUri = vscode.Uri.file(oldLocalPath);
         for (const tabGroup of vscode.window.tabGroups.all) {
           for (const tab of tabGroup.tabs) {
             const input = tab.input;
@@ -659,7 +662,11 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
               for (const item of items) {
                 const destPath = targetFolder.data.remotePath + "/" + path.posix.basename(item.remotePath);
                 await this.service.moveFile(item.deviceId, item.remotePath, destPath, runAs);
-                await this.closeAndCleanupCachedFile(item.deviceId, item.remotePath, path.posix.basename(item.remotePath));
+                if (item.isDirectory) {
+                  await this.closeAndCleanupCachedFolder(item.deviceId, item.remotePath);
+                } else {
+                  await this.closeAndCleanupCachedFile(item.deviceId, item.remotePath, path.posix.basename(item.remotePath));
+                }
               }
             }
           );
@@ -751,8 +758,12 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         const runAs = t.data.packageName || t.data.entry?.packageName;
         if (mode === "move") {
           await this.service.moveFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
-          // Close editor tab and clean up cache for moved file
-          await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
+          // Close editor tabs and clean up cache for moved file/folder
+          if (t.data.type === "folder") {
+            await this.closeAndCleanupCachedFolder(t.data.deviceId, t.data.remotePath);
+          } else {
+            await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
+          }
         } else {
           await this.service.copyFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
         }
@@ -822,6 +833,41 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     // Delete local cache
     if (fs.existsSync(localPath)) {
       try { fs.unlinkSync(localPath); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Close editor tabs and clean up cache for all files under a remote folder
+   */
+  private async closeAndCleanupCachedFolder(deviceId: string, remotePath: string): Promise<void> {
+    // Find all openedFiles under this folder
+    const keysToClean: string[] = [];
+    for (const [key, info] of this.openedFiles) {
+      if (info.deviceId === deviceId && info.remotePath.startsWith(remotePath + "/")) {
+        keysToClean.push(key);
+      }
+    }
+    for (const key of keysToClean) {
+      const info = this.openedFiles.get(key);
+      if (info) {
+        // Close editor tab
+        const localKey = normalizeKey(info.localPath);
+        for (const tabGroup of vscode.window.tabGroups.all) {
+          for (const tab of tabGroup.tabs) {
+            const input = tab.input;
+            if (input && typeof input === "object" && "uri" in input) {
+              const uri = (input as { uri: vscode.Uri }).uri;
+              if (normalizeKey(uri.fsPath) === localKey) {
+                await vscode.window.tabGroups.close(tab);
+              }
+            }
+          }
+        }
+        this.unwatchFile(key);
+        if (fs.existsSync(info.localPath)) {
+          try { fs.unlinkSync(info.localPath); } catch { /* ignore */ }
+        }
+      }
     }
   }
 
