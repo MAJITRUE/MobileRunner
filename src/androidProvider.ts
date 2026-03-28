@@ -194,7 +194,7 @@ export class AndroidProvider implements PlatformProvider {
     const fs = await import("fs");
     return new Promise<void>((resolve, reject) => {
       const proc = cp.spawn(this.getAdbPath(), [
-        "-s", deviceId, "exec-out", "run-as", packageName, "cat", this.sq(remotePath),
+        "-s", deviceId, "exec-out", "run-as", packageName, "cat", remotePath,
       ]);
       const ws = fs.createWriteStream(localPath);
       proc.stdout.pipe(ws);
