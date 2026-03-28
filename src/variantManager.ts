@@ -166,7 +166,7 @@ export class VariantManager implements vscode.Disposable {
 
     this.scanning = true;
     const device = this.deviceManager.getCurrentDevice();
-    const scanLabel = device?.platform === "ios" ? "Xcode..." : device?.platform === "android" ? "Gradle..." : vscode.l10n.t("Scanning...");
+    const scanLabel = device?.platform === "ios" ? "Xcode sync..." : device?.platform === "android" ? "Gradle sync..." : vscode.l10n.t("Scanning...");
     this.statusBarItem.text = `$(loading~spin) ${scanLabel}`;
 
     this.scanPromise = (async () => {
