@@ -503,6 +503,45 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const runAs = item.data.packageName || item.data.entry.packageName;
     try {
       await this.service.renameFile(item.data.deviceId, item.data.remotePath, newPath, runAs);
+
+      // Update local cache file and reopen editor if the file was open
+      const oldHash = crypto.createHash("md5").update(item.data.deviceId + ":" + item.data.remotePath).digest("hex").slice(0, 8);
+      const oldLocalPath = path.join(this.tmpRoot, oldHash, item.data.entry.name);
+      const oldKey = normalizeKey(oldLocalPath);
+
+      if (fs.existsSync(oldLocalPath)) {
+        // Rename local cache file
+        const newLocalPath = path.join(this.tmpRoot, oldHash, newName);
+        fs.renameSync(oldLocalPath, newLocalPath);
+
+        // Update watcher and mapping
+        this.unwatchFile(oldKey);
+        const newInfo: OpenedFileInfo = {
+          deviceId: item.data.deviceId,
+          remotePath: newPath,
+          runAsPackage: runAs,
+          localPath: newLocalPath,
+        };
+        this.openedFiles.set(normalizeKey(newLocalPath), newInfo);
+        this.watchFile(newLocalPath, newInfo);
+        this.saveMappings();
+
+        // Close old editor tab and open renamed file
+        for (const tabGroup of vscode.window.tabGroups.all) {
+          for (const tab of tabGroup.tabs) {
+            const input = tab.input;
+            if (input && typeof input === "object" && "uri" in input) {
+              const uri = (input as { uri: vscode.Uri }).uri;
+              if (normalizeKey(uri.fsPath) === oldKey) {
+                await vscode.window.tabGroups.close(tab);
+                break;
+              }
+            }
+          }
+        }
+        await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(newLocalPath), { preserveFocus: true, preview: true });
+      }
+
       this.refreshTree();
     } catch (err: any) {
       vscode.window.showErrorMessage(vscode.l10n.t("Rename failed: {0}", err?.message || String(err)));
