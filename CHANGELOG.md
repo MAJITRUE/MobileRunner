@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.6 (2026-03-29)
+
+- README updates: status bar order, variant picker description, `projectSearchDepth` setting
+
 ## 0.5.5 (2026-03-29)
 
 - **Multi-project variant picker** — All projects in workspace shown with project name sections; select variant from any project
