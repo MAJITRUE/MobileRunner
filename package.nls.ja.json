@@ -33,5 +33,6 @@
   "config.explorerFileSizeLimit.description": "デバイスエクスプローラーでファイルを開く/ダウンロード時の警告サイズ（MB）。0で無効。",
   "command.fileExplorer.moveTo": "移動先...",
   "command.fileExplorer.copyTo": "コピー先...",
-  "config.explorerCacheDays.description": "デバイスエクスプローラーのキャッシュ保持日数。0でキャッシュ無効。"
+  "config.explorerCacheDays.description": "デバイスエクスプローラーのキャッシュ保持日数。0でキャッシュ無効。",
+  "config.explorerRefreshOnExpand.description": "フォルダ展開時に内容を再取得します。無効にするとキャッシュを使用し、手動更新まで反映されません。"
 }

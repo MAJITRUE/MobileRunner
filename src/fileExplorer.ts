@@ -99,6 +99,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
   private currentDevice: Device | undefined;
   private treeView: vscode.TreeView<FileExplorerItem>;
   private disposables: vscode.Disposable[] = [];
+  private childrenCache = new Map<string, FileExplorerItem[]>(); // remotePath → cached children
   private openedFiles = new Map<string, OpenedFileInfo>(); // normalizedLocalPath → info
   private pushDebounceTimers = new Map<string, NodeJS.Timeout>();
   private fileWatchers = new Map<string, fs.FSWatcher>(); // normalizedLocalPath → watcher
@@ -227,6 +228,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
   private setDevice(device: Device | undefined): void {
     const isAndroid = device?.platform === "android" && device.isOnline;
     this.currentDevice = isAndroid ? device : undefined;
+    this.childrenCache.clear();
     vscode.commands.executeCommand("setContext", "native-runner.hasAndroidDevice", isAndroid);
     this.treeView.title = this.currentDevice?.name
       || vscode.l10n.t("No device");
@@ -291,6 +293,14 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     // Directory listing
     const remotePath = element.data.remotePath;
     const runAsPackage = element.data.packageName || element.data.entry?.packageName;
+    const refreshOnExpand = vscode.workspace.getConfiguration("native-runner").get<boolean>("explorerRefreshOnExpand", true);
+
+    // Return cache if available and refreshOnExpand is disabled
+    if (!refreshOnExpand) {
+      const cached = this.childrenCache.get(remotePath);
+      if (cached) { return cached; }
+    }
+
     const entries = await this.service.listDirectory(deviceId, remotePath, runAsPackage);
 
     if (entries.length === 0) {
@@ -301,7 +311,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       )];
     }
 
-    return entries.map((entry) => {
+    const items = entries.map((entry) => {
       if (entry.isError) {
         return new FileExplorerItem(
           { type: "error", deviceId, remotePath: entry.path },
@@ -316,11 +326,16 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         entry.isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
       );
     });
+
+    // Cache for non-refresh mode
+    this.childrenCache.set(remotePath, items);
+    return items;
   }
 
   // --- Actions ---
 
   refresh(): void {
+    this.childrenCache.clear();
     this.onDidChangeTreeDataEmitter.fire(undefined);
   }
 
