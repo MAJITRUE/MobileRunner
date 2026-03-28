@@ -316,8 +316,13 @@ export class DeviceManager implements vscode.Disposable {
       const stillExists = this.devices.find((d) => d.id === this.currentDevice!.id);
       if (!stillExists) {
         this.currentDevice = undefined;
+        this.onDeviceChangedEmitter.fire(undefined);
+      } else if (!stillExists.isOnline && this.currentDevice.isOnline) {
+        // Device went offline
+        this.currentDevice = stillExists;
+        this.onDeviceChangedEmitter.fire(stillExists);
       } else {
-        // Update device state (online/offline) but keep selection
+        // Update device state but keep selection
         this.currentDevice = stillExists;
       }
     }
