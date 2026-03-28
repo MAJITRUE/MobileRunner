@@ -644,11 +644,6 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
 
   private async transferToFolder(item: FileExplorerItem, mode: "move" | "copy"): Promise<void> {
     if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
-
-    if (!await this.confirmFolderOperation({ remotePath: item.data.remotePath, type: item.data.type, entry: item.data.entry }, mode)) {
-      return;
-    }
-
     const deviceId = item.data.deviceId;
     const runAs = item.data.packageName || item.data.entry?.packageName;
 
