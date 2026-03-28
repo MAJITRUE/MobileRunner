@@ -529,6 +529,8 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const targetFolder = isFolder ? target : undefined;
     if (!targetFolder?.data?.remotePath) { return; }
 
+    const runAs = targetFolder.data.packageName || targetFolder.data.entry?.packageName;
+
     // Internal tree drag: move files within device
     const internalData = dataTransfer.get("application/vnd.native-runner.file-explorer");
     if (internalData) {
@@ -560,7 +562,6 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const uris = raw.split("\n").map(s => s.trim()).filter(Boolean).map(s => vscode.Uri.parse(s));
     if (uris.length === 0) { return; }
 
-    const runAs = targetFolder.data.packageName || targetFolder.data.entry?.packageName;
     try {
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Uploading...") },
