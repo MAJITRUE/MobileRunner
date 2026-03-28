@@ -75,7 +75,8 @@ export class IosProvider implements PlatformProvider {
     // Physical devices (Xcode 15+ devicectl)
     try {
       const physicalDevices = await this.getPhysicalDevices();
-      devices.push(...physicalDevices);
+      // Exclude any device whose ID is a known simulator UDID
+      devices.push(...physicalDevices.filter((d) => !this.simulatorUdids.has(d.id)));
     } catch { /* ignore */ }
 
     return devices;
