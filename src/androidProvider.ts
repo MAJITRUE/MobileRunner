@@ -355,24 +355,33 @@ export class AndroidProvider implements PlatformProvider {
     return findAllProjectRoots(this.getMatcher(), workspaceFolders, activeFilePath);
   }
 
-  public async getPackageInfo(projectRoot: string, _variant: string, _artifactPath?: string): Promise<{
+  public async getPackageInfo(projectRoot: string, _variant: string, artifactPath?: string): Promise<{
     packageName: string;
     launchTarget?: string;
   }> {
     const appModule = this.getAppModule();
     let packageName: string | undefined;
 
-    for (const gradleFile of [`${appModule}/build.gradle.kts`, `${appModule}/build.gradle`]) {
-      const gradlePath = path.join(projectRoot, gradleFile);
-      if (fs.existsSync(gradlePath)) {
-        const content = fs.readFileSync(gradlePath, "utf-8");
-        const appIdMatch = content.match(/applicationId\s*[=( ]\s*"([^"]+)"/);
-        if (appIdMatch) { packageName = appIdMatch[1]; break; }
-        const nsMatch = content.match(/namespace\s*[=( ]\s*"([^"]+)"/);
-        if (nsMatch) { packageName = nsMatch[1]; break; }
+    // Tier 1: Read from built APK via aapt2 (most reliable — includes flavor applicationIdSuffix)
+    if (artifactPath) {
+      packageName = await this.readPackageNameFromApk(artifactPath);
+    }
+
+    // Tier 2: Parse build.gradle for applicationId / namespace
+    if (!packageName) {
+      for (const gradleFile of [`${appModule}/build.gradle.kts`, `${appModule}/build.gradle`]) {
+        const gradlePath = path.join(projectRoot, gradleFile);
+        if (fs.existsSync(gradlePath)) {
+          const content = fs.readFileSync(gradlePath, "utf-8");
+          const appIdMatch = content.match(/applicationId\s*[=( ]\s*"([^"]+)"/);
+          if (appIdMatch) { packageName = appIdMatch[1]; break; }
+          const nsMatch = content.match(/namespace\s*[=( ]\s*"([^"]+)"/);
+          if (nsMatch) { packageName = nsMatch[1]; break; }
+        }
       }
     }
 
+    // Tier 3: Parse AndroidManifest.xml
     const manifestPath = path.join(projectRoot, appModule, "src", "main", "AndroidManifest.xml");
     if (!packageName && fs.existsSync(manifestPath)) {
       const content = fs.readFileSync(manifestPath, "utf-8");
@@ -381,7 +390,7 @@ export class AndroidProvider implements PlatformProvider {
     }
 
     if (!packageName) {
-      throw new Error(vscode.l10n.t("Could not determine package name from AndroidManifest.xml"));
+      throw new Error(vscode.l10n.t("Could not determine package name"));
     }
 
     let launcherActivity: string | undefined;
@@ -480,6 +489,24 @@ export class AndroidProvider implements PlatformProvider {
       const output = await this.exec(this.getAdbPath(), ["-s", deviceId, "emu", "avd", "name"]);
       const name = output.split("\n")[0]?.trim();
       return name && name !== "OK" ? name.replace(/_/g, " ") : undefined;
+    } catch { return undefined; }
+  }
+
+  private async readPackageNameFromApk(apkPath: string): Promise<string | undefined> {
+    // Find aapt2 in build-tools
+    if (!this.sdkPath) { return undefined; }
+    const buildToolsDir = path.join(this.sdkPath, "build-tools");
+    if (!fs.existsSync(buildToolsDir)) { return undefined; }
+    const versions = fs.readdirSync(buildToolsDir).sort().reverse();
+    if (versions.length === 0) { return undefined; }
+    const exe = process.platform === "win32" ? "aapt2.exe" : "aapt2";
+    const aapt2 = path.join(buildToolsDir, versions[0], exe);
+    if (!fs.existsSync(aapt2)) { return undefined; }
+
+    try {
+      const output = await this.exec(aapt2, ["dump", "badging", apkPath], 15000);
+      const match = output.match(/package:\s+name='([^']+)'/);
+      return match ? match[1] : undefined;
     } catch { return undefined; }
   }
 
