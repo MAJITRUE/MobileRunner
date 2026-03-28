@@ -683,38 +683,25 @@ export class IosProvider implements PlatformProvider {
     if (!xcodeProject) { return []; }
 
     try {
-      const args = [
-        xcodeProject.type === "workspace" ? "-workspace" : "-project",
-        xcodeProject.path,
-        "-list", "-json",
-      ];
-      const output = await this.exec("xcodebuild", args, 30000);
-      const json = JSON.parse(output);
-      const key = xcodeProject.type === "workspace" ? "workspace" : "project";
-      const schemes: string[] = json[key]?.schemes || [];
-
-      // Collect pod names from Pods/ directory to exclude framework schemes
-      const podsDir = path.join(projectRoot, "Pods");
-      const podNames = new Set<string>();
-      if (fs.existsSync(podsDir)) {
-        for (const entry of fs.readdirSync(podsDir)) {
-          // Skip special directories
-          if (entry === "Target Support Files" || entry === "Headers"
-            || entry === "Local Podspecs" || entry.startsWith(".")) { continue; }
-          const fullPath = path.join(podsDir, entry);
-          if (fs.statSync(fullPath).isDirectory()) {
-            podNames.add(entry);
-          }
+      // Always query the .xcodeproj (not .xcworkspace) to get only project-owned schemes.
+      // Workspace schemes include all dependencies (Pods, Flutter modules, etc.)
+      let projectPath = xcodeProject.path;
+      if (xcodeProject.type === "workspace") {
+        // Find the .xcodeproj in the same directory
+        const dir = path.dirname(xcodeProject.path);
+        const proj = fs.readdirSync(dir).find((e) => e.endsWith(".xcodeproj"));
+        if (proj) {
+          projectPath = path.join(dir, proj);
         }
       }
 
+      const args = ["-project", projectPath, "-list", "-json"];
+      const output = await this.exec("xcodebuild", args, 30000);
+      const json = JSON.parse(output);
+      const schemes: string[] = json.project?.schemes || [];
+
       return schemes.filter((s) => {
         if (s.endsWith("Tests") || s.endsWith("UITests")) { return false; }
-        if (s.startsWith("Pods-")) { return false; }
-        if (podNames.has(s)) { return false; }
-        // Exclude pod-derived schemes like "FirebaseCore-FirebaseCore_Privacy"
-        const baseName = s.split("-")[0];
-        if (baseName !== s && podNames.has(baseName)) { return false; }
         return true;
       });
     } catch { return []; }
