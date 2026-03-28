@@ -268,7 +268,7 @@ export class BuildRunner implements vscode.Disposable {
     const device = this.deviceManager.getCurrentDevice();
     if (device) { await this.stopDevice(device.id); }
     this.killBuild();
-    await this.installAndRun(true);
+    await this.installAndRun(false);
   }
 
   public onDebugSessionEnded(session: vscode.DebugSession): void {
