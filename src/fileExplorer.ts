@@ -446,6 +446,9 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       for (const t of targets) {
         const runAs = t.data.packageName || t.data.entry?.packageName;
         await this.service.deleteFile(t.data.deviceId, t.data.remotePath, runAs);
+
+        // Close editor tab and clean up cache for deleted file
+        await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
       }
       vscode.window.showInformationMessage(vscode.l10n.t("Deleted"));
       this.refreshTree();
@@ -656,6 +659,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
               for (const item of items) {
                 const destPath = targetFolder.data.remotePath + "/" + path.posix.basename(item.remotePath);
                 await this.service.moveFile(item.deviceId, item.remotePath, destPath, runAs);
+                await this.closeAndCleanupCachedFile(item.deviceId, item.remotePath, path.posix.basename(item.remotePath));
               }
             }
           );
@@ -747,6 +751,8 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
         const runAs = t.data.packageName || t.data.entry?.packageName;
         if (mode === "move") {
           await this.service.moveFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
+          // Close editor tab and clean up cache for moved file
+          await this.closeAndCleanupCachedFile(t.data.deviceId, t.data.remotePath, t.data.entry?.name);
         } else {
           await this.service.copyFile(t.data.deviceId, t.data.remotePath, destPath, runAs);
         }
@@ -786,6 +792,37 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
       }
     }
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(localPath));
+  }
+
+  /**
+   * Close editor tab and clean up local cache for a remote file
+   */
+  private async closeAndCleanupCachedFile(deviceId: string, remotePath: string, fileName?: string): Promise<void> {
+    const hash = crypto.createHash("md5").update(deviceId + ":" + remotePath).digest("hex").slice(0, 8);
+    const name = fileName || path.posix.basename(remotePath);
+    const localPath = path.join(this.tmpRoot, hash, name);
+    const key = normalizeKey(localPath);
+
+    // Close editor tab if open
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        const input = tab.input;
+        if (input && typeof input === "object" && "uri" in input) {
+          const uri = (input as { uri: vscode.Uri }).uri;
+          if (normalizeKey(uri.fsPath) === key) {
+            await vscode.window.tabGroups.close(tab);
+          }
+        }
+      }
+    }
+
+    // Stop watcher and remove mapping
+    this.unwatchFile(key);
+
+    // Delete local cache
+    if (fs.existsSync(localPath)) {
+      try { fs.unlinkSync(localPath); } catch { /* ignore */ }
+    }
   }
 
   private resolveItems(item: FileExplorerItem, items?: FileExplorerItem[]): FileExplorerItem[] {
