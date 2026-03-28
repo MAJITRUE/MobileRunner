@@ -483,35 +483,48 @@ export class AndroidProvider implements PlatformProvider {
     const appModule = this.getAppModule();
     const parentDir = path.dirname(projectRoot);
 
-    // For flavored builds (e.g. "verDevDebug"), APK is at apk/verDev/debug/
-    // Try to split variant into flavor + buildType by matching common suffixes
-    const buildTypes = ["debug", "release", "staging", "profile"];
-    let flavorPath: string | undefined;
-    for (const bt of buildTypes) {
-      if (variant.toLowerCase().endsWith(bt.toLowerCase()) && variant.length > bt.length) {
-        const flavor = variant.slice(0, variant.length - bt.length);
-        // Lowercase first char of flavor for directory name
-        const flavorDir = flavor.charAt(0).toLowerCase() + flavor.slice(1);
-        flavorPath = path.join(flavorDir, bt);
-        break;
-      }
-    }
-
-    const searchDirs = [
-      path.join(projectRoot, appModule, "build", "outputs", "apk", variant),
-      ...(flavorPath ? [path.join(projectRoot, appModule, "build", "outputs", "apk", flavorPath)] : []),
+    // Search locations for APK directory
+    const apkRoots = [
+      path.join(projectRoot, appModule, "build", "outputs", "apk"),
       path.join(projectRoot, appModule, "build", "outputs", "flutter-apk"),
-      path.join(parentDir, "build", appModule, "outputs", "apk", variant),
-      ...(flavorPath ? [path.join(parentDir, "build", appModule, "outputs", "apk", flavorPath)] : []),
+      path.join(parentDir, "build", appModule, "outputs", "apk"),
       path.join(parentDir, "build", appModule, "outputs", "flutter-apk"),
     ];
 
-    for (const apkDir of searchDirs) {
-      if (!fs.existsSync(apkDir)) { continue; }
-      const files = fs.readdirSync(apkDir).filter((f) => f.endsWith(".apk") && !f.endsWith("-androidTest.apk"));
-      if (files.length > 0) { return path.join(apkDir, files[0]); }
+    // Recursively find all APK files, then match by variant name
+    const variantLower = variant.toLowerCase();
+    const allApks: string[] = [];
+    const matchingApks: string[] = [];
+
+    for (const apkRoot of apkRoots) {
+      if (!fs.existsSync(apkRoot)) { continue; }
+      const stack = [apkRoot];
+      while (stack.length > 0) {
+        const dir = stack.pop()!;
+        try {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              stack.push(full);
+            } else if (entry.name.endsWith(".apk") && !entry.name.endsWith("-androidTest.apk")) {
+              allApks.push(full);
+              const lower = full.toLowerCase();
+              if (lower.includes(`${path.sep}${variantLower}${path.sep}`) || path.basename(lower).includes(variantLower)) {
+                matchingApks.push(full);
+              }
+            }
+          }
+        } catch { /* ignore permission errors */ }
+      }
     }
-    return undefined;
+
+    // Prefer variant-matching APKs, fall back to any APK
+    const candidates = matchingApks.length > 0 ? matchingApks : allApks;
+    if (candidates.length === 0) { return undefined; }
+
+    // Return the most recently modified APK
+    candidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    return candidates[0];
   }
 
   private runGradle(
