@@ -261,6 +261,12 @@
         "command": "native-runner.fileExplorer.delete",
         "key": "delete",
         "when": "focusedView == deviceFileExplorer && listFocus"
+      },
+      {
+        "command": "native-runner.fileExplorer.revealInExplorer",
+        "key": "shift+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "focusedView == deviceFileExplorer && listFocus"
       }
     ],
     "debuggers": [
