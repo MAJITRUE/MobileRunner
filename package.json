@@ -167,6 +167,12 @@
         "command": "native-runner.fileExplorer.copyTo",
         "title": "%command.fileExplorer.copyTo%",
         "category": "Native Runner"
+      },
+      {
+        "command": "native-runner.fileExplorer.clearCache",
+        "title": "%command.fileExplorer.clearCache%",
+        "category": "Native Runner",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -178,6 +184,11 @@
         },
         {
           "command": "native-runner.fileExplorer.refresh",
+          "when": "view == deviceFileExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "native-runner.fileExplorer.clearCache",
           "when": "view == deviceFileExplorer",
           "group": "navigation"
         }

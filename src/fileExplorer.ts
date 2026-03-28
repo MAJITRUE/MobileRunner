@@ -660,6 +660,55 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     if (cleaned) { this.saveMappings(); }
   }
 
+  async clearCache(): Promise<void> {
+    const size = this.getCacheSize();
+    const sizeStr = formatSize(size);
+
+    const confirm = await vscode.window.showWarningMessage(
+      vscode.l10n.t("Clear all cached files? ({0})", sizeStr),
+      { modal: true },
+      vscode.l10n.t("Clear")
+    );
+    if (!confirm) { return; }
+
+    // Stop all watchers and clear mappings
+    for (const [key] of this.openedFiles) {
+      this.unwatchFile(key);
+    }
+    this.openedFiles.clear();
+    this.saveMappings();
+
+    // Delete cache directory
+    if (fs.existsSync(this.tmpRoot)) {
+      fs.rmSync(this.tmpRoot, { recursive: true, force: true });
+    }
+
+    vscode.window.showInformationMessage(vscode.l10n.t("Cache cleared ({0})", sizeStr));
+  }
+
+  getCacheSizeFormatted(): string {
+    return formatSize(this.getCacheSize());
+  }
+
+  private getCacheSize(): number {
+    if (!fs.existsSync(this.tmpRoot)) { return 0; }
+    let total = 0;
+    const walk = (dir: string) => {
+      try {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const p = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(p);
+          } else {
+            total += fs.statSync(p).size;
+          }
+        }
+      } catch { /* ignore */ }
+    };
+    walk(this.tmpRoot);
+    return total;
+  }
+
   dispose(): void {
     for (const timer of this.pushDebounceTimers.values()) { clearTimeout(timer); }
     this.pushDebounceTimers.clear();

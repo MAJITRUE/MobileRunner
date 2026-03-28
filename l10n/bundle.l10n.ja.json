@@ -95,5 +95,8 @@
   "Move failed: {0}": "移動失敗: {0}",
   "Copy failed: {0}": "コピー失敗: {0}",
   "Move to (remote path)": "移動先（リモートパス）",
-  "Copy to (remote path)": "コピー先（リモートパス）"
+  "Copy to (remote path)": "コピー先（リモートパス）",
+  "Clear all cached files? ({0})": "キャッシュをすべて削除しますか？（{0}）",
+  "Clear": "クリア",
+  "Cache cleared ({0})": "キャッシュを削除しました（{0}）"
 }

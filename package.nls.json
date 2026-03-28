@@ -33,6 +33,7 @@
   "config.explorerFileSizeLimit.description": "File size limit (MB) for open/download warnings in Device Explorer. Set to 0 to disable.",
   "command.fileExplorer.moveTo": "Move To...",
   "command.fileExplorer.copyTo": "Copy To...",
+  "command.fileExplorer.clearCache": "Clear Cache",
   "config.explorerCacheDays.description": "Number of days to keep cached files from Device Explorer. Set to 0 to disable caching.",
   "config.explorerRefreshOnExpand.description": "Re-fetch folder contents each time a folder is expanded. When disabled, cached data is used until manual refresh."
 }
