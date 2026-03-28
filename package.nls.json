@@ -31,5 +31,6 @@
   "config.showBuildControls.description": "Show Build/Run/Stop controls in the status bar.",
   "config.showVariantSelector.description": "Show build variant selector in the status bar.",
   "config.explorerFileSizeLimit.description": "File size limit (MB) for open/download warnings in Device Explorer. Set to 0 to disable.",
-  "config.explorerCacheDays.description": "Number of days to keep cached files from Device Explorer. Set to 0 to disable caching."
+  "config.explorerCacheDays.description": "Number of days to keep cached files from Device Explorer. Set to 0 to disable caching.",
+  "config.explorerRefreshOnExpand.description": "Re-fetch folder contents each time a folder is expanded. When disabled, cached data is used until manual refresh."
 }

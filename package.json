@@ -293,6 +293,11 @@
           "type": "number",
           "default": 7,
           "description": "%config.explorerCacheDays.description%"
+        },
+        "native-runner.explorerRefreshOnExpand": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.explorerRefreshOnExpand.description%"
         }
       }
     }
