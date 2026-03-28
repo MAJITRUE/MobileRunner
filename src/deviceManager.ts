@@ -14,6 +14,7 @@ export class DeviceManager implements vscode.Disposable {
   private devices: Device[] = [];
   private pollTimer: NodeJS.Timeout | undefined;
   private disposables: vscode.Disposable[] = [];
+  private availablePlatforms: Set<string> | undefined;
 
   private readonly onDeviceChangedEmitter = new vscode.EventEmitter<Device | undefined>();
   public readonly onDeviceChanged = this.onDeviceChangedEmitter.event;
@@ -47,6 +48,35 @@ export class DeviceManager implements vscode.Disposable {
     }));
 
     if (this.needsPolling()) { this.startPolling(); }
+
+    // Detect available platforms on startup and when workspace changes
+    this.detectAvailablePlatforms();
+    this.disposables.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => this.detectAvailablePlatforms())
+    );
+  }
+
+  /**
+   * Detect which platforms have projects in the workspace.
+   * Caches result to avoid repeated filesystem scans.
+   */
+  private detectAvailablePlatforms(): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+      this.availablePlatforms = undefined;
+      return;
+    }
+    const platforms = new Set<string>();
+    for (const provider of this.providers) {
+      if (provider.findProjectRoot(workspaceFolders)) {
+        platforms.add(provider.platform);
+      }
+    }
+    this.availablePlatforms = platforms.size > 0 ? platforms : undefined;
+  }
+
+  public getAvailablePlatforms(): Set<string> | undefined {
+    return this.availablePlatforms;
   }
 
   public getCurrentDevice(): Device | undefined {
@@ -103,9 +133,10 @@ export class DeviceManager implements vscode.Disposable {
   private async buildPickerItems(): Promise<DevicePickItem[]> {
     const items: DevicePickItem[] = [];
 
-    // Collect emulators from all providers
+    // Collect emulators from providers with matching projects
     const allEmulators: Emulator[] = [];
     for (const provider of this.providers) {
+      if (this.availablePlatforms && !this.availablePlatforms.has(provider.platform)) { continue; }
       const emus = await provider.getAvailableEmulators();
       allEmulators.push(...emus);
     }
@@ -306,6 +337,8 @@ export class DeviceManager implements vscode.Disposable {
   public async refreshDevices(): Promise<void> {
     const allDevices: Device[] = [];
     for (const provider of this.providers) {
+      // Skip providers whose platform has no project in workspace
+      if (this.availablePlatforms && !this.availablePlatforms.has(provider.platform)) { continue; }
       const devices = await provider.getConnectedDevices();
       allDevices.push(...devices);
     }
