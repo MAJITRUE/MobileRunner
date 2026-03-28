@@ -545,7 +545,7 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
   handleDrag(source: readonly FileExplorerItem[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void {
     const paths = source
       .filter((s) => s.data.type === "file" || s.data.type === "folder")
-      .map((s) => JSON.stringify({ remotePath: s.data.remotePath, packageName: s.data.packageName || s.data.entry?.packageName, deviceId: s.data.deviceId }));
+      .map((s) => JSON.stringify({ remotePath: s.data.remotePath, packageName: s.data.packageName || s.data.entry?.packageName, deviceId: s.data.deviceId, isDirectory: s.data.type === "folder" }));
     if (paths.length > 0) {
       dataTransfer.set("application/vnd.native-runner.file-explorer", new vscode.DataTransferItem(paths.join("\n")));
     }
@@ -565,8 +565,19 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     const internalData = dataTransfer.get("application/vnd.native-runner.file-explorer");
     if (internalData) {
       const raw = await internalData.asString();
-      const items = raw.split("\n").filter(Boolean).map((s) => JSON.parse(s) as { remotePath: string; packageName?: string; deviceId: string });
+      const items = raw.split("\n").filter(Boolean).map((s) => JSON.parse(s) as { remotePath: string; packageName?: string; deviceId: string; isDirectory?: boolean });
       if (items.length > 0 && items[0].deviceId === targetFolder.data.deviceId) {
+        // Confirm if any dragged item is a folder
+        const hasFolder = items.some((item) => item.isDirectory);
+        if (hasFolder) {
+          const folderNames = items.filter((i) => i.isDirectory).map((i) => path.posix.basename(i.remotePath)).join(", ");
+          const result = await vscode.window.showWarningMessage(
+            vscode.l10n.t("Move folder \"{0}\" and all its contents?", folderNames),
+            { modal: true },
+            vscode.l10n.t("Move")
+          );
+          if (!result) { return; }
+        }
         try {
           await vscode.window.withProgress(
             { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Moving...") },
@@ -609,6 +620,20 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
+  private async confirmFolderOperation(item: { remotePath: string; type?: string; entry?: { isDirectory?: boolean } }, mode: "move" | "copy"): Promise<boolean> {
+    const isDir = item.type === "folder" || item.entry?.isDirectory;
+    if (!isDir) { return true; }
+
+    const action = mode === "move" ? vscode.l10n.t("Move") : vscode.l10n.t("Copy");
+    const folderName = path.posix.basename(item.remotePath);
+    const result = await vscode.window.showWarningMessage(
+      vscode.l10n.t("{0} folder \"{1}\" and all its contents?", action, folderName),
+      { modal: true },
+      action
+    );
+    return result === action;
+  }
+
   async moveToFolder(item: FileExplorerItem): Promise<void> {
     await this.transferToFolder(item, "move");
   }
@@ -619,6 +644,11 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
 
   private async transferToFolder(item: FileExplorerItem, mode: "move" | "copy"): Promise<void> {
     if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
+
+    if (!await this.confirmFolderOperation({ remotePath: item.data.remotePath, type: item.data.type, entry: item.data.entry }, mode)) {
+      return;
+    }
+
     const deviceId = item.data.deviceId;
     const runAs = item.data.packageName || item.data.entry?.packageName;
 
