@@ -272,8 +272,8 @@
       },
       {
         "command": "native-runner.fileExplorer.copyPath",
-        "key": "ctrl+shift+c",
-        "mac": "cmd+shift+c",
+        "key": "shift+alt+c",
+        "mac": "cmd+alt+c",
         "when": "focusedView == deviceFileExplorer && listFocus"
       }
     ],
