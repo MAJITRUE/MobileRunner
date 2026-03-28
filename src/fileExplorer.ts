@@ -649,6 +649,25 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     }
   }
 
+  async revealInExplorer(item: FileExplorerItem): Promise<void> {
+    if (!item?.data?.deviceId || !item?.data?.remotePath) { return; }
+
+    // Check if this file has been opened/cached locally
+    const hash = crypto.createHash("md5").update(item.data.deviceId + ":" + item.data.remotePath).digest("hex").slice(0, 8);
+    const tmpDir = path.join(this.tmpRoot, hash);
+    const fileName = item.data.entry?.name || path.posix.basename(item.data.remotePath);
+    const localPath = path.join(tmpDir, fileName);
+
+    if (fs.existsSync(localPath)) {
+      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(localPath));
+    } else {
+      // File not cached yet — open the cache root
+      vscode.window.showInformationMessage(
+        vscode.l10n.t("File not cached. Open the file first, then use Reveal in Explorer.")
+      );
+    }
+  }
+
   private cleanExpiredCache(): void {
     const days = vscode.workspace.getConfiguration("native-runner").get<number>("explorerCacheDays", 7);
     if (days <= 0 || !fs.existsSync(this.tmpRoot)) { return; }

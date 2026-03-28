@@ -100,6 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("native-runner.fileExplorer.moveTo", (item) => { fileExplorer.moveToFolder(item); }),
     vscode.commands.registerCommand("native-runner.fileExplorer.copyTo", (item) => { fileExplorer.copyToFolder(item); }),
     vscode.commands.registerCommand("native-runner.fileExplorer.clearCache", () => { fileExplorer.clearCache(); }),
+    vscode.commands.registerCommand("native-runner.fileExplorer.revealInExplorer", (item) => { fileExplorer.revealInExplorer(item); }),
   );
 
   // Internal: called from debug adapter launch handler (F5)

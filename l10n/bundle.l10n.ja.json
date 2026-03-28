@@ -99,5 +99,6 @@
   "Clear all cached files? ({0})": "キャッシュをすべて削除しますか？（{0}）",
   "Clear": "クリア",
   "Cache cleared ({0})": "キャッシュを削除しました（{0}）",
-  "Cache cleared. {0} file(s) in use were skipped.": "キャッシュを削除しました。使用中の {0} ファイルはスキップしました。"
+  "Cache cleared. {0} file(s) in use were skipped.": "キャッシュを削除しました。使用中の {0} ファイルはスキップしました。",
+  "File not cached. Open the file first, then use Reveal in Explorer.": "ファイルがキャッシュされていません。先にファイルを開いてから実行してください。"
 }
