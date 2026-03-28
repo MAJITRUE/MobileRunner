@@ -226,9 +226,24 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
   }
 
   private setDevice(device: Device | undefined): void {
+    const previousDeviceId = this.currentDevice?.id;
     const isAndroid = device?.platform === "android" && device.isOnline;
     this.currentDevice = isAndroid ? device : undefined;
     this.childrenCache.clear();
+
+    // Stop watchers for the disconnected device to prevent push errors
+    if (previousDeviceId && (!this.currentDevice || this.currentDevice.id !== previousDeviceId)) {
+      const keysToRemove: string[] = [];
+      for (const [key, info] of this.openedFiles) {
+        if (info.deviceId === previousDeviceId) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const key of keysToRemove) {
+        this.unwatchFile(key);
+      }
+    }
+
     vscode.commands.executeCommand("setContext", "native-runner.hasAndroidDevice", isAndroid);
     this.treeView.title = this.currentDevice?.name
       || vscode.l10n.t("No device");
