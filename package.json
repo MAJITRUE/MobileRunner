@@ -183,7 +183,7 @@
     "menus": {
       "view/title": [
         {
-          "command": "native-runner.fileExplorer.selectDevice",
+          "command": "native-runner.fileExplorer.clearCache",
           "when": "view == deviceFileExplorer",
           "group": "navigation"
         },
@@ -193,7 +193,7 @@
           "group": "navigation"
         },
         {
-          "command": "native-runner.fileExplorer.clearCache",
+          "command": "native-runner.fileExplorer.selectDevice",
           "when": "view == deviceFileExplorer",
           "group": "navigation"
         }
