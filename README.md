@@ -26,7 +26,8 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 
   - Drag & drop upload from VSCode explorer
   - Click to open files — save to auto-push back to device (works with any editor, including SQLite3 Editor)
-  - Rename, create files/folders
+  - Rename, create files/folders, move, copy
+  - Drag & drop within tree to move files on device
   - File size warning for large files
   - Cache with configurable expiry (default 7 days)
   - Independent device selection from build controls
@@ -79,6 +80,7 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 | `native-runner.showVariantSelector` | `true` | Show build variant selector in the status bar. |
 | `native-runner.explorerFileSizeLimit` | `10` | File size limit (MB) for open/download warnings. 0 to disable. |
 | `native-runner.explorerCacheDays` | `7` | Days to keep cached files from Device Explorer. 0 to disable. |
+| `native-runner.explorerRefreshOnExpand` | `true` | Re-fetch folder contents on each expand. Set to false for cached mode. |
 
 ## Commands
 
@@ -95,6 +97,8 @@ Build, install, and run Android & iOS apps directly from VSCode. Includes Device
 | `Native Runner: New Folder` | Create folder on device |
 | `Native Runner: New File` | Create empty file on device |
 | `Native Runner: Rename` | Rename file/folder on device |
+| `Native Runner: Move To...` | Move file/folder to another location on device |
+| `Native Runner: Copy To...` | Copy file/folder to another location on device |
 
 ## F5 / launch.json
 
@@ -142,7 +146,8 @@ VSCode から Android / iOS アプリをビルド・インストール・実行�
 
   - VSCodeエクスプローラーからドラッグ&ドロップでアップロード
   - クリックでファイルを開く — 保存時にデバイスへ自動書き戻し（SQLite3 Editor等のカスタムエディタも対応）
-  - リネーム、ファイル/フォルダー新規作成
+  - リネーム、ファイル/フォルダー新規作成、移動、コピー
+  - デバイス内ドラッグ&ドロップでファイル移動
   - 大きなファイルのサイズ警告
   - キャッシュ管理（デフォルト7日で自動削除）
   - ビルド用セレクターとは独立したデバイス選択

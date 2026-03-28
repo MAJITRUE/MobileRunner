@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3 (2026-03-28)
+
+- **Device Explorer: Move & Copy** — Right-click "Move To..." / "Copy To..." for files and folders on device
+- **Device Explorer: Drag & Drop move** — Drag files/folders within the tree to move them on the device
+- **explorerRefreshOnExpand setting** — Re-fetch folder contents on each expand (default: true). Set to false for cached mode with manual refresh.
+- **Flutter project exclusion** — Skip Gradle/Xcode projects that are part of a Flutter project when Dart-Code extension is installed
+- Fixed: `runAs` variable initialization order in drag & drop move (was causing "Cannot access before initialization" error)
+
 ## 0.5.2 (2026-03-21)
 
 - Fixed: Extension not activating on iOS projects (`.xcodeproj`/`.xcworkspace` are directories, not files — changed activation patterns to match files inside them)
