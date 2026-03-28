@@ -215,29 +215,14 @@
           "group": "2_transfer@2"
         },
         {
-          "command": "native-runner.fileExplorer.newFolder",
-          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
-          "group": "3_edit@1"
-        },
-        {
-          "command": "native-runner.fileExplorer.newFile",
-          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
-          "group": "3_edit@2"
-        },
-        {
-          "command": "native-runner.fileExplorer.rename",
-          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
-          "group": "3_edit@3"
-        },
-        {
           "command": "native-runner.fileExplorer.moveTo",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
-          "group": "3_edit@4"
+          "group": "3_move@1"
         },
         {
           "command": "native-runner.fileExplorer.copyTo",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
-          "group": "3_edit@5"
+          "group": "3_move@2"
         },
         {
           "command": "native-runner.fileExplorer.copyPath",
@@ -250,9 +235,24 @@
           "group": "4_copy@2"
         },
         {
+          "command": "native-runner.fileExplorer.newFolder",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
+          "group": "5_new@1"
+        },
+        {
+          "command": "native-runner.fileExplorer.newFile",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFolder|deviceRoot/",
+          "group": "5_new@2"
+        },
+        {
+          "command": "native-runner.fileExplorer.rename",
+          "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
+          "group": "6_edit@1"
+        },
+        {
           "command": "native-runner.fileExplorer.delete",
           "when": "view == deviceFileExplorer && viewItem =~ /deviceFile|deviceFolder/",
-          "group": "5_danger@1"
+          "group": "7_danger@1"
         }
       ]
     },
