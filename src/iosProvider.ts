@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import * as vscode from "vscode";
-import { Device, Emulator, PlatformProvider, findProjectRootCommon } from "./types";
+import { Device, Emulator, PlatformProvider, findProjectRootCommon, findAllProjectRoots } from "./types";
 
 export class IosProvider implements PlatformProvider {
   readonly platform = "ios" as const;
@@ -562,12 +562,16 @@ export class IosProvider implements PlatformProvider {
 
   // --- Project Detection ---
 
+  private getMatcher(): (dir: string) => boolean {
+    return (dir) => !!this.findXcodeProject(dir) && !this.isFlutterProject(dir);
+  }
+
   public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
-    return findProjectRootCommon(
-      (dir) => !!this.findXcodeProject(dir) && !this.isFlutterProject(dir),
-      workspaceFolders,
-      activeFilePath,
-    );
+    return findProjectRootCommon(this.getMatcher(), workspaceFolders, activeFilePath);
+  }
+
+  public findAllProjectRoots(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string[] {
+    return findAllProjectRoots(this.getMatcher(), workspaceFolders, activeFilePath);
   }
 
   /**

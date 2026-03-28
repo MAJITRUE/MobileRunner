@@ -2,7 +2,7 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as vscode from "vscode";
-import { Device, Emulator, PlatformProvider, findProjectRootCommon } from "./types";
+import { Device, Emulator, PlatformProvider, findProjectRootCommon, findAllProjectRoots } from "./types";
 
 export class AndroidProvider implements PlatformProvider {
   readonly platform = "android" as const;
@@ -343,12 +343,16 @@ export class AndroidProvider implements PlatformProvider {
     return false;
   }
 
+  private getMatcher(): (dir: string) => boolean {
+    return (dir) => this.hasGradleProject(dir) && !this.isFlutterProject(dir);
+  }
+
   public findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined {
-    return findProjectRootCommon(
-      (dir) => this.hasGradleProject(dir) && !this.isFlutterProject(dir),
-      workspaceFolders,
-      activeFilePath,
-    );
+    return findProjectRootCommon(this.getMatcher(), workspaceFolders, activeFilePath);
+  }
+
+  public findAllProjectRoots(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string[] {
+    return findAllProjectRoots(this.getMatcher(), workspaceFolders, activeFilePath);
   }
 
   public async getPackageInfo(projectRoot: string, _variant: string, _artifactPath?: string): Promise<{

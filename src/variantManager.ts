@@ -1,17 +1,23 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { DeviceManager } from "./deviceManager";
 import { PlatformProvider } from "./types";
 
+interface ProjectVariants {
+  projectRoot: string;
+  projectName: string;
+  variants: string[];
+}
+
 export class VariantManager implements vscode.Disposable {
   private statusBarItem: vscode.StatusBarItem;
-  private cachedVariants: string[] | undefined;
+  private cachedProjects: ProjectVariants[] | undefined;
   private selectedVariant: string | undefined;
+  private selectedProjectRoot: string | undefined;
   private scanning = false;
   private scanPromise: Promise<string[]> | undefined;
   private outputChannel: vscode.LogOutputChannel | undefined;
   private disposables: vscode.Disposable[] = [];
-
-  private lastProjectRoot: string | undefined;
 
   constructor(
     private providers: PlatformProvider[],
@@ -42,7 +48,7 @@ export class VariantManager implements vscode.Disposable {
     // Invalidate cache when device changes (platform may change)
     this.disposables.push(
       this.deviceManager.onDeviceChanged(() => {
-        this.cachedVariants = undefined;
+        this.cachedProjects = undefined;
         this.updateStatusBar();
       })
     );
@@ -62,8 +68,12 @@ export class VariantManager implements vscode.Disposable {
     return config.get<string>("buildVariant", "debug");
   }
 
+  public getSelectedProjectRoot(): string | undefined {
+    return this.selectedProjectRoot;
+  }
+
   public hasCachedVariants(): boolean {
-    return this.cachedVariants !== undefined;
+    return this.cachedProjects !== undefined;
   }
 
   private getCurrentProvider(): PlatformProvider | undefined {
@@ -74,17 +84,13 @@ export class VariantManager implements vscode.Disposable {
 
   public async showVariantPicker(): Promise<string | undefined> {
     const quickPick = vscode.window.createQuickPick<VariantPickItem>();
-    const device = this.deviceManager.getCurrentDevice();
-    const isIos = device?.platform === "ios";
-    quickPick.placeholder = isIos
-      ? vscode.l10n.t("Select Xcode Scheme")
-      : vscode.l10n.t("Select Build Variant");
+    quickPick.placeholder = vscode.l10n.t("Select Build Variant / Scheme");
     quickPick.ignoreFocusOut = true;
 
     const current = this.getSelectedVariant();
 
-    if (this.cachedVariants) {
-      quickPick.items = this.buildPickerItems(this.cachedVariants, current);
+    if (this.cachedProjects && this.cachedProjects.length > 0) {
+      quickPick.items = this.buildPickerItems(this.cachedProjects, current);
     } else {
       quickPick.items = [{
         label: `$(check) ${current || "(none)"}`,
@@ -111,15 +117,16 @@ export class VariantManager implements vscode.Disposable {
     if (!selection) { return undefined; }
 
     if (selection.action === "rescan") {
-      this.cachedVariants = undefined;
+      this.cachedProjects = undefined;
       await this.triggerScan();
       return this.showVariantPicker();
     }
 
     if (selection.variant) {
       this.selectedVariant = selection.variant;
-      if (this.lastProjectRoot) {
-        this.workspaceState.update(`variant:${this.lastProjectRoot}`, selection.variant);
+      if (selection.projectRoot) {
+        this.selectedProjectRoot = selection.projectRoot;
+        this.workspaceState.update(`variant:${selection.projectRoot}`, selection.variant);
       }
       this.updateStatusBar();
       return selection.variant;
@@ -136,7 +143,8 @@ export class VariantManager implements vscode.Disposable {
   public async triggerScan(silent = false): Promise<string[]> {
     if (this.scanning) {
       if (this.scanPromise) { return this.scanPromise; }
-      return this.cachedVariants || [];
+      const allVariants = this.cachedProjects?.flatMap((p) => p.variants) || [];
+      return allVariants;
     }
 
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -144,46 +152,59 @@ export class VariantManager implements vscode.Disposable {
 
     const activeFilePath = vscode.window.activeTextEditor?.document.uri.fsPath;
 
-    // Try current device's provider first, then fall back to all providers
-    let provider = this.getCurrentProvider();
-    let projectRoot = provider?.findProjectRoot(workspaceFolders, activeFilePath);
-    if (!projectRoot) {
-      for (const p of this.providers) {
-        projectRoot = p.findProjectRoot(workspaceFolders, activeFilePath);
-        if (projectRoot) { provider = p; break; }
+    // Find all project roots from all providers
+    const allRoots: { root: string; provider: PlatformProvider }[] = [];
+    for (const p of this.providers) {
+      const roots = p.findAllProjectRoots(workspaceFolders, activeFilePath);
+      for (const root of roots) {
+        allRoots.push({ root, provider: p });
       }
     }
-    if (!provider || !projectRoot) { return []; }
+    if (allRoots.length === 0) { return []; }
 
     this.scanning = true;
     this.statusBarItem.text = `$(loading~spin) ${vscode.l10n.t("Scanning...")}`;
 
     this.scanPromise = (async () => {
       try {
-        let variants: string[];
-        if (silent) {
-          variants = await provider!.scanVariants(projectRoot!);
-        } else {
-          variants = await vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Scanning build variants...") },
-            () => provider!.scanVariants(projectRoot!)
-          );
+        const projects: ProjectVariants[] = [];
+        for (const { root, provider } of allRoots) {
+          let variants: string[];
+          if (silent) {
+            variants = await provider.scanVariants(root);
+          } else {
+            variants = await vscode.window.withProgress(
+              { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t("Scanning {0}...", path.basename(root)) },
+              () => provider.scanVariants(root)
+            );
+          }
+          if (variants.length > 0) {
+            projects.push({
+              projectRoot: root,
+              projectName: path.basename(root),
+              variants,
+            });
+            this.outputChannel?.info(vscode.l10n.t("Found variants in {0}: {1}", path.basename(root), variants.join(", ")));
+          }
         }
-        this.cachedVariants = variants;
-        this.lastProjectRoot = projectRoot!;
-        if (variants.length > 0) {
-          this.outputChannel?.info(vscode.l10n.t("Found variants: {0}", variants.join(", ")));
-          // Restore previous selection for this project, or auto-select first
-          const saved = this.workspaceState.get<string>(`variant:${projectRoot}`);
+        this.cachedProjects = projects;
+
+        // Restore previous selection or auto-select first variant of first project
+        const allVariants = projects.flatMap((p) => p.variants);
+        if (allVariants.length > 0) {
+          const firstProject = projects[0];
+          const saved = this.workspaceState.get<string>(`variant:${firstProject.projectRoot}`);
           const current = this.getSelectedVariant();
-          if (saved && variants.includes(saved)) {
+          if (saved && allVariants.includes(saved)) {
             this.selectedVariant = saved;
-          } else if (!variants.includes(current)) {
-            this.selectedVariant = variants[0];
+            this.selectedProjectRoot = firstProject.projectRoot;
+          } else if (!allVariants.includes(current)) {
+            this.selectedVariant = allVariants[0];
+            this.selectedProjectRoot = firstProject.projectRoot;
           }
         }
         this.updateStatusBar();
-        return variants;
+        return allVariants;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         this.outputChannel?.warn(vscode.l10n.t("Failed to scan build variants: {0}", msg));
@@ -197,23 +218,24 @@ export class VariantManager implements vscode.Disposable {
     return this.scanPromise;
   }
 
-  private buildPickerItems(variants: string[], current: string): VariantPickItem[] {
+  private buildPickerItems(projects: ProjectVariants[], current: string): VariantPickItem[] {
     const items: VariantPickItem[] = [];
 
-    const device = this.deviceManager.getCurrentDevice();
-    const sectionLabel = device?.platform === "ios"
-      ? vscode.l10n.t("Xcode Schemes")
-      : vscode.l10n.t("Build Variants");
-
-    items.push({ label: sectionLabel, kind: vscode.QuickPickItemKind.Separator });
-
-    for (const variant of variants) {
-      const isCurrent = variant === current;
+    for (const project of projects) {
       items.push({
-        label: isCurrent ? `$(check) ${variant}` : `$(package) ${variant}`,
-        description: isCurrent ? vscode.l10n.t("(current)") : undefined,
-        variant,
+        label: project.projectName,
+        kind: vscode.QuickPickItemKind.Separator,
       });
+
+      for (const variant of project.variants) {
+        const isCurrent = variant === current && project.projectRoot === this.selectedProjectRoot;
+        items.push({
+          label: isCurrent ? `$(check) ${variant}` : `$(package) ${variant}`,
+          description: isCurrent ? vscode.l10n.t("(current)") : undefined,
+          variant,
+          projectRoot: project.projectRoot,
+        });
+      }
     }
 
     items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
@@ -238,7 +260,7 @@ export class VariantManager implements vscode.Disposable {
   }
 
   public invalidateCache(): void {
-    this.cachedVariants = undefined;
+    this.cachedProjects = undefined;
   }
 
   dispose(): void {
@@ -248,5 +270,6 @@ export class VariantManager implements vscode.Disposable {
 
 interface VariantPickItem extends vscode.QuickPickItem {
   variant?: string;
+  projectRoot?: string;
   action?: "rescan";
 }

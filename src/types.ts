@@ -40,6 +40,40 @@ export function findProjectRootCommon(
   return undefined;
 }
 
+/**
+ * Find ALL matching project roots in workspace folders.
+ */
+export function findAllProjectRoots(
+  matcher: (dir: string) => boolean,
+  workspaceFolders: readonly vscode.WorkspaceFolder[],
+  activeFilePath?: string,
+  maxDepth?: number,
+): string[] {
+  const depth = maxDepth ?? vscode.workspace.getConfiguration("native-runner").get<number>("projectSearchDepth", 2);
+  const results: string[] = [];
+
+  // Strategy 1: Walk up from active file
+  if (activeFilePath) {
+    let dir = path.dirname(activeFilePath);
+    while (dir !== path.dirname(dir)) {
+      const dirName = path.basename(dir);
+      if (!SKIP_DIRS.has(dirName) && matcher(dir)) {
+        results.push(dir);
+        break; // Only one result from upward walk
+      }
+      dir = path.dirname(dir);
+    }
+  }
+
+  // Strategy 2: Scan workspace folders — collect all matches
+  for (const folder of workspaceFolders) {
+    scanDirAll(folder.uri.fsPath, matcher, depth, 0, results);
+  }
+
+  // Deduplicate
+  return [...new Set(results)];
+}
+
 function scanDir(dir: string, matcher: (dir: string) => boolean, maxDepth: number, currentDepth: number): string | undefined {
   if (matcher(dir)) { return dir; }
   if (currentDepth >= maxDepth) { return undefined; }
@@ -54,6 +88,20 @@ function scanDir(dir: string, matcher: (dir: string) => boolean, maxDepth: numbe
     }
   } catch { /* ignore permission errors etc. */ }
   return undefined;
+}
+
+function scanDirAll(dir: string, matcher: (dir: string) => boolean, maxDepth: number, currentDepth: number, results: string[]): void {
+  if (matcher(dir)) { results.push(dir); return; } // Don't recurse into matched project
+  if (currentDepth >= maxDepth) { return; }
+
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) { continue; }
+      if (entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) { continue; }
+      scanDirAll(path.join(dir, entry.name), matcher, maxDepth, currentDepth + 1, results);
+    }
+  } catch { /* ignore */ }
 }
 
 export type Platform = "android" | "ios";
@@ -133,6 +181,7 @@ export interface PlatformProvider {
    *  Strategy: if activeFilePath is provided, walk up from there looking for project markers.
    *  Otherwise scan workspace folders and their immediate subdirectories. */
   findProjectRoot(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string | undefined;
+  findAllProjectRoots(workspaceFolders: readonly vscode.WorkspaceFolder[], activeFilePath?: string): string[];
 
   /** Get package/bundle info from project */
   getPackageInfo(projectRoot: string, variant: string, artifactPath?: string): Promise<{
