@@ -673,6 +673,12 @@ export class DeviceFileExplorer implements vscode.TreeDataProvider<FileExplorerI
     if (!dest) { return; }
 
     try {
+      // Ensure destination directory exists
+      const destDir = dest.endsWith("/") ? dest : path.posix.dirname(dest);
+      const firstTarget = targets[0];
+      const runAsForMkdir = firstTarget.data.packageName || firstTarget.data.entry?.packageName;
+      await this.service.makeDirectory(firstTarget.data.deviceId, destDir, runAsForMkdir);
+
       for (const t of targets) {
         const destPath = isSingle && !dest.endsWith("/")
           ? dest
